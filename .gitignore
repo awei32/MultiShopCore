@@ -4,3 +4,5 @@
 .idea
 # maven
 repository
+# target文件夹下所有
+target

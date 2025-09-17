@@ -10,6 +10,7 @@
     <packaging>pom</packaging>
     <modules>
         <module>msc-common</module>
+        <module>msc-user</module>
     </modules>
 
     <properties>
