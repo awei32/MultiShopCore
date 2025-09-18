@@ -1,0 +1,1 @@
+mvn clean dependency:purge-local-repository install -U -s ./env/settings.xml -Dmaven.test.skip=true

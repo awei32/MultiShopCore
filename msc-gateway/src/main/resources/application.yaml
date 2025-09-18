@@ -1,0 +1,62 @@
+server:
+    port: 8080
+
+spring:
+    application:
+        name: msc-gateway
+    cloud:
+        nacos:
+            discovery:
+                server-addr: ${nacos.server-ip:127.0.0.1}:${nacos.server.port:8848}
+                namespace: ${nacos.namespace:}
+                group: ${nacos.group:DEFAULT_GROUP}
+        gateway:
+            discovery:
+                locator:
+                    enabled: true
+                    lower-case-service-id: true
+            # 全局跨域配置
+            globalcors:
+                cors-configurations:
+                    '[/**]':
+                        allowed-origin-patterns: "*"
+                        allowed-methods: "*"
+                        allowed-headers: "*"
+                        allow-credentials: true
+                        max-age: 3600
+    # Redis配置（用于限流等功能）
+    data:
+        redis:
+            host: ${redis.host:127.0.0.1}
+            port: ${redis.port:6379}
+            password: ${redis.password:}
+            database: ${redis.database:0}
+            timeout: 3000ms
+            lettuce:
+                pool:
+                    max-active: 8
+                    max-idle: 8
+                    min-idle: 0
+
+# JWT配置
+jwt:
+    secret: THIS_IS_MY_FIRST_OPEN_SOURCE_PROJECT
+    expiration: 86400
+
+# 日志配置
+logging:
+    level:
+        com.msc: debug
+        org.springframework.cloud.gateway: debug
+    pattern:
+        console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
+
+# 监控端点配置
+management:
+    endpoints:
+        web:
+            exposure:
+                include: health,info,gateway
+    endpoint:
+        health:
+            show-details: always
