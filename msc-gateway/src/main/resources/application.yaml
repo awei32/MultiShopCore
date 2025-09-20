@@ -15,6 +15,47 @@ spring:
                 locator:
                     enabled: true
                     lower-case-service-id: true
+            # 路由配置
+            routes:
+                # 用户服务路由
+                - id: user-service
+                  uri: lb://msc-user
+                  predicates:
+                      - Path=/api/user/**
+                  filters:
+                      - StripPrefix=2
+                      - name: RequestRateLimiter
+                        args:
+                            redis-rate-limiter.replenishRate: 10
+                            redis-rate-limiter.burstCapacity: 20
+                            key-resolver: "#{@ipKeyResolver}"
+                
+                # 订单服务路由
+                - id: order-service
+                  uri: lb://msc-order
+                  predicates:
+                      - Path=/api/order/**
+                  filters:
+                      - StripPrefix=2
+                      - name: RequestRateLimiter
+                        args:
+                            redis-rate-limiter.replenishRate: 10
+                            redis-rate-limiter.burstCapacity: 20
+                            key-resolver: "#{@ipKeyResolver}"
+                
+                # 商品服务路由
+                - id: product-service
+                  uri: lb://msc-product
+                  predicates:
+                      - Path=/api/product/**
+                  filters:
+                      - StripPrefix=2
+                      - name: RequestRateLimiter
+                        args:
+                            redis-rate-limiter.replenishRate: 15
+                            redis-rate-limiter.burstCapacity: 30
+                            key-resolver: "#{@ipKeyResolver}"
+            
             # 全局跨域配置
             globalcors:
                 cors-configurations:
