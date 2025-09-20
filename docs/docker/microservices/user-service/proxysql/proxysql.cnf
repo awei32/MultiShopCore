@@ -1,0 +1,118 @@
+datadir="/var/lib/proxysql"
+
+admin_variables=
+{
+    admin_credentials="admin:admin123"
+    mysql_ifaces="0.0.0.0:6032"
+    refresh_interval=2000
+}
+
+mysql_variables=
+{
+    threads=4
+    max_connections=2048
+    default_query_delay=0
+    default_query_timeout=36000000
+    have_compress=true
+    poll_timeout=2000
+    interfaces="0.0.0.0:6033"
+    default_schema="user_service_db"
+    stacksize=1048576
+    server_version="8.0.25"
+    connect_timeout_server=3000
+    monitor_username="user_service"
+    monitor_password="userdb123"
+    monitor_history=600000
+    monitor_connect_interval=60000
+    monitor_ping_interval=10000
+    monitor_read_only_interval=1500
+    monitor_read_only_timeout=500
+    ping_interval_server_msec=120000
+    ping_timeout_server=500
+    commands_stats=true
+    sessions_sort=true
+    connect_retries_on_failure=10
+}
+
+mysql_servers =
+(
+    {
+        address="user-mysql-master"
+        port=3306
+        hostgroup=0
+        weight=1000
+        status="ONLINE"
+        compression=0
+        max_connections=200
+        max_replication_lag=10
+        use_ssl=0
+        max_latency_ms=0
+        comment="User Service Master"
+    },
+    {
+        address="user-mysql-slave1"
+        port=3306
+        hostgroup=1
+        weight=900
+        status="ONLINE"
+        compression=0
+        max_connections=200
+        max_replication_lag=10
+        use_ssl=0
+        max_latency_ms=0
+        comment="User Service Slave 1"
+    },
+    {
+        address="user-mysql-slave2"
+        port=3306
+        hostgroup=1
+        weight=900
+        status="ONLINE"
+        compression=0
+        max_connections=200
+        max_replication_lag=10
+        use_ssl=0
+        max_latency_ms=0
+        comment="User Service Slave 2"
+    }
+)
+
+mysql_users =
+(
+    {
+        username = "user_service"
+        password = "userdb123"
+        default_hostgroup = 0
+        max_connections=200
+        default_schema="user_service_db"
+        active = 1
+    }
+)
+
+mysql_query_rules =
+(
+    {
+        rule_id=1
+        active=1
+        match_pattern="^SELECT.*FOR UPDATE$"
+        destination_hostgroup=0
+        apply=1
+        comment="Send SELECT FOR UPDATE to master"
+    },
+    {
+        rule_id=2
+        active=1
+        match_pattern="^SELECT"
+        destination_hostgroup=1
+        apply=1
+        comment="Send SELECT to slaves"
+    },
+    {
+        rule_id=3
+        active=1
+        match_pattern="^INSERT|^UPDATE|^DELETE"
+        destination_hostgroup=0
+        apply=1
+        comment="Send writes to master"
+    }
+)

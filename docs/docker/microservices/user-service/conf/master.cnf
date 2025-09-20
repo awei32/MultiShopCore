@@ -1,0 +1,52 @@
+[mysqld]
+# 基本设置
+default-storage-engine=INNODB
+character-set-server=utf8mb4
+collation-server=utf8mb4_unicode_ci
+init_connect='SET NAMES utf8mb4'
+
+# 服务器ID（主库）
+server-id=1
+
+# 二进制日志设置
+log-bin=mysql-bin
+binlog_format=ROW
+expire_logs_days=7
+max_binlog_size=100M
+
+# 主从复制设置
+sync_binlog=1
+binlog-do-db=user_service_db
+
+# 连接设置
+max_connections=500
+max_connect_errors=10
+
+# 缓存设置
+innodb_buffer_pool_size=512M
+query_cache_size=64M
+query_cache_type=1
+
+# 日志设置
+log-error=/var/log/mysql/error.log
+slow_query_log=1
+slow_query_log_file=/var/log/mysql/slow.log
+long_query_time=2
+
+# 时区设置
+default-time-zone='+8:00'
+
+# InnoDB设置
+innodb_file_per_table=1
+innodb_flush_log_at_trx_commit=1
+innodb_log_buffer_size=32M
+innodb_log_file_size=256M
+
+# 主库特有设置
+read-only=0
+
+[mysql]
+default-character-set=utf8mb4
+
+[client]
+default-character-set=utf8mb4

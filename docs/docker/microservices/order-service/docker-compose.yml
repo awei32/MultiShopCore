@@ -1,0 +1,105 @@
+version: '3.8'
+
+services:
+  # 订单服务主数据库
+  order-mysql-master:
+    image: mysql:8.0
+    container_name: order-mysql-master
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: orderdb_root123
+      MYSQL_DATABASE: order_service_db
+      MYSQL_USER: order_service
+      MYSQL_PASSWORD: orderdb123
+      TZ: Asia/Shanghai
+    ports:
+      - "3316:3306"
+    volumes:
+      - order_mysql_master_data:/var/lib/mysql
+      - ./conf/master.cnf:/etc/mysql/conf.d/mysql.cnf
+      - ./init:/docker-entrypoint-initdb.d
+      - ./logs/master:/var/log/mysql
+    command: --default-authentication-plugin=mysql_native_password --server-id=11 --log-bin=mysql-bin --binlog-format=ROW
+    networks:
+      - order-service-network
+
+  # 订单服务从数据库1
+  order-mysql-slave1:
+    image: mysql:8.0
+    container_name: order-mysql-slave1
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: orderdb_root123
+      MYSQL_DATABASE: order_service_db
+      MYSQL_USER: order_service
+      MYSQL_PASSWORD: orderdb123
+      TZ: Asia/Shanghai
+    ports:
+      - "3317:3306"
+    volumes:
+      - order_mysql_slave1_data:/var/lib/mysql
+      - ./conf/slave.cnf:/etc/mysql/conf.d/mysql.cnf
+      - ./logs/slave1:/var/log/mysql
+    command: --default-authentication-plugin=mysql_native_password --server-id=12 --relay-log=mysql-relay-bin
+    depends_on:
+      - order-mysql-master
+    networks:
+      - order-service-network
+
+  # 订单服务从数据库2
+  order-mysql-slave2:
+    image: mysql:8.0
+    container_name: order-mysql-slave2
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: orderdb_root123
+      MYSQL_DATABASE: order_service_db
+      MYSQL_USER: order_service
+      MYSQL_PASSWORD: orderdb123
+      TZ: Asia/Shanghai
+    ports:
+      - "3318:3306"
+    volumes:
+      - order_mysql_slave2_data:/var/lib/mysql
+      - ./conf/slave.cnf:/etc/mysql/conf.d/mysql.cnf
+      - ./logs/slave2:/var/log/mysql
+    command: --default-authentication-plugin=mysql_native_password --server-id=13 --relay-log=mysql-relay-bin
+    depends_on:
+      - order-mysql-master
+    networks:
+      - order-service-network
+
+  # ProxySQL 负载均衡器
+  order-proxysql:
+    image: proxysql/proxysql:2.5.5
+    container_name: order-proxysql
+    restart: always
+    ports:
+      - "6043:6033"  # MySQL接口
+      - "6042:6032"  # 管理接口
+    volumes:
+      - ./proxysql/proxysql.cnf:/etc/proxysql.cnf
+      - order_proxysql_data:/var/lib/proxysql
+    depends_on:
+      - order-mysql-master
+      - order-mysql-slave1
+      - order-mysql-slave2
+    networks:
+      - order-service-network
+
+volumes:
+  order_mysql_master_data:
+    driver: local
+  order_mysql_slave1_data:
+    driver: local
+  order_mysql_slave2_data:
+    driver: local
+  order_proxysql_data:
+    driver: local
+
+networks:
+  order-service-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.21.0.0/16

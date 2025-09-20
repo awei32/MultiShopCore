@@ -1,0 +1,185 @@
+version: '3.8'
+
+# 简化版微服务数据库配置
+# 配合 Spring Cloud Gateway 使用
+# 每个微服务使用主从配置，通过应用层负载均衡
+
+services:
+  # ==================== 用户服务数据库 ====================
+  user-mysql-master:
+    image: mysql:8.0
+    container_name: user-mysql-master
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: userdb_root123
+      MYSQL_DATABASE: user_service_db
+      MYSQL_USER: user_service
+      MYSQL_PASSWORD: userdb123
+    ports:
+      - "3306:3306"
+    volumes:
+      - user_mysql_master_data:/var/lib/mysql
+      - ./conf/user-master.cnf:/etc/mysql/conf.d/my.cnf
+      - ./init/user:/docker-entrypoint-initdb.d
+    networks:
+      - microservices-net
+
+  user-mysql-slave:
+    image: mysql:8.0
+    container_name: user-mysql-slave
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: userdb_root123
+      MYSQL_DATABASE: user_service_db
+      MYSQL_USER: user_service
+      MYSQL_PASSWORD: userdb123
+    ports:
+      - "3307:3306"
+    volumes:
+      - user_mysql_slave_data:/var/lib/mysql
+      - ./conf/user-slave.cnf:/etc/mysql/conf.d/my.cnf
+    depends_on:
+      - user-mysql-master
+    networks:
+      - microservices-net
+
+  # ==================== 订单服务数据库 ====================
+  order-mysql-master:
+    image: mysql:8.0
+    container_name: order-mysql-master
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: orderdb_root123
+      MYSQL_DATABASE: order_service_db
+      MYSQL_USER: order_service
+      MYSQL_PASSWORD: orderdb123
+    ports:
+      - "3316:3306"
+    volumes:
+      - order_mysql_master_data:/var/lib/mysql
+      - ./conf/order-master.cnf:/etc/mysql/conf.d/my.cnf
+      - ./init/order:/docker-entrypoint-initdb.d
+    networks:
+      - microservices-net
+
+  order-mysql-slave:
+    image: mysql:8.0
+    container_name: order-mysql-slave
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: orderdb_root123
+      MYSQL_DATABASE: order_service_db
+      MYSQL_USER: order_service
+      MYSQL_PASSWORD: orderdb123
+    ports:
+      - "3317:3306"
+    volumes:
+      - order_mysql_slave_data:/var/lib/mysql
+      - ./conf/order-slave.cnf:/etc/mysql/conf.d/my.cnf
+    depends_on:
+      - order-mysql-master
+    networks:
+      - microservices-net
+
+  # ==================== 商品服务数据库 ====================
+  product-mysql-master:
+    image: mysql:8.0
+    container_name: product-mysql-master
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: productdb_root123
+      MYSQL_DATABASE: product_service_db
+      MYSQL_USER: product_service
+      MYSQL_PASSWORD: productdb123
+    ports:
+      - "3326:3306"
+    volumes:
+      - product_mysql_master_data:/var/lib/mysql
+      - ./conf/product-master.cnf:/etc/mysql/conf.d/my.cnf
+      - ./init/product:/docker-entrypoint-initdb.d
+    networks:
+      - microservices-net
+
+  product-mysql-slave:
+    image: mysql:8.0
+    container_name: product-mysql-slave
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: productdb_root123
+      MYSQL_DATABASE: product_service_db
+      MYSQL_USER: product_service
+      MYSQL_PASSWORD: productdb123
+    ports:
+      - "3327:3306"
+    volumes:
+      - product_mysql_slave_data:/var/lib/mysql
+      - ./conf/product-slave.cnf:/etc/mysql/conf.d/my.cnf
+    depends_on:
+      - product-mysql-master
+    networks:
+      - microservices-net
+
+  # ==================== Redis（网关限流等） ====================
+  redis:
+    image: redis:7-alpine
+    container_name: microservices-redis
+    restart: always
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - microservices-net
+
+  # ==================== Nacos（服务发现） ====================
+  nacos:
+    image: nacos/nacos-server:v2.2.3
+    container_name: microservices-nacos
+    restart: always
+    environment:
+      MODE: standalone
+      SPRING_DATASOURCE_PLATFORM: mysql
+      MYSQL_SERVICE_HOST: nacos-mysql
+      MYSQL_SERVICE_PORT: 3306
+      MYSQL_SERVICE_DB_NAME: nacos
+      MYSQL_SERVICE_USER: nacos
+      MYSQL_SERVICE_PASSWORD: nacos123
+    ports:
+      - "8848:8848"
+      - "9848:9848"
+    depends_on:
+      - nacos-mysql
+    networks:
+      - microservices-net
+
+  # Nacos 配置数据库
+  nacos-mysql:
+    image: mysql:8.0
+    container_name: nacos-mysql
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: nacos_root123
+      MYSQL_DATABASE: nacos
+      MYSQL_USER: nacos
+      MYSQL_PASSWORD: nacos123
+    ports:
+      - "3336:3306"
+    volumes:
+      - nacos_mysql_data:/var/lib/mysql
+      - ./init/nacos:/docker-entrypoint-initdb.d
+    networks:
+      - microservices-net
+
+volumes:
+  user_mysql_master_data:
+  user_mysql_slave_data:
+  order_mysql_master_data:
+  order_mysql_slave_data:
+  product_mysql_master_data:
+  product_mysql_slave_data:
+  redis_data:
+  nacos_mysql_data:
+
+networks:
+  microservices-net:
+    driver: bridge
