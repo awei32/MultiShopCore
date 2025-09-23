@@ -4,5 +4,12 @@
 .idea
 # maven
 repository
+# trae
+.trae
+# lingma
+.lingma
 # target文件夹下所有
-target
+target 
+
+# macOS下的DS_Store文件
+.DS_Store
