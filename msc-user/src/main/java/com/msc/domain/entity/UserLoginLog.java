@@ -1,11 +1,13 @@
 package com.msc.domain.entity;
 
-import java.time.LocalDateTime;
-
+import com.baomidou.mybatisplus.annotation.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import lombok.EqualsAndHashCode;
+
+import java.time.LocalDateTime;
 
 /**
  * 用户登录日志实体类
@@ -14,171 +16,134 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
+@EqualsAndHashCode(callSuper = false)
+@TableName("user_login_log")
 public class UserLoginLog {
     
     /**
      * 日志ID
      */
+    @TableId(value = "id", type = IdType.AUTO)
     private Long id;
     
     /**
      * 用户ID
      */
+    @TableField("user_id")
     private Long userId;
     
     /**
-     * 登录类型:1-密码登录,2-短信登录,3-第三方登录
+     * 登录类型:password,sms,wechat,alipay
      */
-    private Integer loginType;
+    @TableField("login_type")
+    private String loginType;
+    
+    /**
+     * 登录设备
+     */
+    @TableField("login_device")
+    private String loginDevice;
     
     /**
      * 登录IP
      */
+    @TableField("login_ip")
     private String loginIp;
     
     /**
-     * 登录地址
+     * 登录地点
      */
-    private String loginAddress;
+    @TableField("login_location")
+    private String loginLocation;
     
     /**
-     * 设备类型:web,ios,android,wechat
+     * 用户代理
      */
-    private String deviceType;
-    
-    /**
-     * 设备信息
-     */
-    private String deviceInfo;
-    
-    /**
-     * 浏览器信息
-     */
-    private String browserInfo;
-    
-    /**
-     * 操作系统
-     */
-    private String osInfo;
+    @TableField("user_agent")
+    private String userAgent;
     
     /**
      * 登录状态:1-成功,0-失败
      */
+    @TableField("login_status")
     private Integer loginStatus;
     
     /**
      * 失败原因
      */
+    @TableField("fail_reason")
     private String failReason;
+    
+    /**
+     * 会话ID
+     */
+    @TableField("session_id")
+    private String sessionId;
     
     /**
      * 登录时间
      */
+    @TableField("login_time")
     private LocalDateTime loginTime;
     
     /**
-     * 登出时间
+     * 退出时间
      */
+    @TableField("logout_time")
     private LocalDateTime logoutTime;
     
     /**
-     * 在线时长(秒)
+     * 自定义构造方法
      */
-    private Long onlineDuration;
-    
-    /**
-     * 创建时间
-     */
-    private LocalDateTime createTime;
-    
-    // 自定义构造方法
-    public UserLoginLog(Long userId, Integer loginType, String loginIp, 
-                       String deviceType, Integer loginStatus) {
+    public UserLoginLog(Long userId, String loginType, String loginIp, 
+                       String loginDevice, Integer loginStatus) {
         this.userId = userId;
         this.loginType = loginType;
         this.loginIp = loginIp;
-        this.deviceType = deviceType;
+        this.loginDevice = loginDevice;
         this.loginStatus = loginStatus;
         this.loginTime = LocalDateTime.now();
     }
 
     
     /**
-     * 登录类型枚举
+     * 登录类型常量
      */
-    public enum LoginType {
-        PASSWORD(1, "密码登录"),
-        SMS(2, "短信登录"),
-        OAUTH(3, "第三方登录");
-        
-        private final Integer code;
-        private final String desc;
-        
-        LoginType(Integer code, String desc) {
-            this.code = code;
-            this.desc = desc;
-        }
-        
-        public Integer getCode() {
-            return code;
-        }
-        
-        public String getDesc() {
-            return desc;
-        }
-        
-        public static LoginType getByCode(Integer code) {
-            for (LoginType type : values()) {
-                if (type.getCode().equals(code)) {
-                    return type;
-                }
-            }
-            return null;
-        }
+    public static final class LoginType {
+        /** 密码登录 */
+        public static final String PASSWORD = "password";
+        /** 短信登录 */
+        public static final String SMS = "sms";
+        /** 微信登录 */
+        public static final String WECHAT = "wechat";
+        /** 支付宝登录 */
+        public static final String ALIPAY = "alipay";
     }
     
     /**
-     * 设备类型枚举
+     * 登录状态常量
      */
-    public enum DeviceType {
-        WEB("web", "网页"),
-        IOS("ios", "iOS"),
-        ANDROID("android", "Android"),
-        WECHAT("wechat", "微信"),
-        MINI_PROGRAM("mini_program", "小程序");
-        
-        private final String code;
-        private final String desc;
-        
-        DeviceType(String code, String desc) {
-            this.code = code;
-            this.desc = desc;
-        }
-        
-        public String getCode() {
-            return code;
-        }
-        
-        public String getDesc() {
-            return desc;
-        }
-        
-        public static DeviceType getByCode(String code) {
-            for (DeviceType type : values()) {
-                if (type.getCode().equals(code)) {
-                    return type;
-                }
-            }
-            return null;
-        }
+    public static final class LoginStatus {
+        /** 登录成功 */
+        public static final Integer SUCCESS = 1;
+        /** 登录失败 */
+        public static final Integer FAILED = 0;
     }
     
     /**
-     * 计算在线时长
+     * 计算在线时长(秒)
      */
-    public void calculateOnlineDuration() {
+    public Long calculateOnlineDuration() {
         if (loginTime != null && logoutTime != null) {
-            this.onlineDuration = java.time.Duration.between(loginTime, logoutTime).getSeconds();
+            return java.time.Duration.between(loginTime, logoutTime).getSeconds();
         }
+        return null;
+    }
+    
+    /**
+     * 是否登录成功
+     */
+    public boolean isLoginSuccess() {
+        return Integer.valueOf(1).equals(this.loginStatus);
     }
 }

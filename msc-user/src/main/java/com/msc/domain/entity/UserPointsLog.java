@@ -1,160 +1,156 @@
 package com.msc.domain.entity;
 
-import java.math.BigDecimal;
-import java.time.LocalDateTime;
-
+import com.baomidou.mybatisplus.annotation.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import lombok.EqualsAndHashCode;
+
+import java.time.LocalDateTime;
 
 /**
- * 用户积分日志实体类
+ * 用户积分记录表实体类
+ *
+ * @author MultiShopCore
+ * @since 1.0.0
  */
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
+@EqualsAndHashCode(callSuper = false)
+@TableName("user_points_log")
 public class UserPointsLog {
     
     /**
-     * 日志ID
+     * 记录ID
      */
+    @TableId(value = "id", type = IdType.AUTO)
     private Long id;
     
     /**
      * 用户ID
      */
+    @TableField("user_id")
     private Long userId;
-    
-    /**
-     * 积分变动类型:1-获得,2-消费,3-过期,4-退还
-     */
-    private Integer changeType;
-    
-    /**
-     * 积分变动数量
-     */
-    private Integer changePoints;
-    
-    /**
-     * 变动前积分
-     */
-    private Integer beforePoints;
-    
-    /**
-     * 变动后积分
-     */
-    private Integer afterPoints;
-    
-    /**
-     * 变动原因
-     */
-    private String reason;
     
     /**
      * 关联订单ID
      */
+    @TableField("order_id")
     private Long orderId;
     
     /**
-     * 关联活动ID
+     * 积分类型:1-获得,2-消费,3-过期,4-退还
      */
-    private Long activityId;
+    @TableField("points_type")
+    private Integer pointsType;
     
     /**
-     * 积分来源:order-订单,activity-活动,manual-手动,system-系统
+     * 积分数量
      */
-    private String source;
+    @TableField("points_amount")
+    private Integer pointsAmount;
+    
+    /**
+     * 积分余额
+     */
+    @TableField("points_balance")
+    private Integer pointsBalance;
+    
+    /**
+     * 来源类型:order,sign,activity,refund等
+     */
+    @TableField("source_type")
+    private String sourceType;
+    
+    /**
+     * 来源ID
+     */
+    @TableField("source_id")
+    private Long sourceId;
+    
+    /**
+     * 描述
+     */
+    @TableField("description")
+    private String description;
     
     /**
      * 过期时间
      */
+    @TableField("expire_time")
     private LocalDateTime expireTime;
     
     /**
      * 创建时间
      */
+    @TableField(value = "create_time", fill = FieldFill.INSERT)
     private LocalDateTime createTime;
     
-    // 自定义构造方法
-    public UserPointsLog(Long userId, Integer changeType, Integer changePoints, 
-                        Integer beforePoints, String reason) {
+    /**
+     * 自定义构造方法
+     */
+    public UserPointsLog(Long userId, Integer pointsType, Integer pointsAmount, 
+                        Integer pointsBalance, String sourceType) {
         this.userId = userId;
-        this.changeType = changeType;
-        this.changePoints = changePoints;
-        this.beforePoints = beforePoints;
-        this.afterPoints = beforePoints + (changeType == 1 ? changePoints : -changePoints);
-        this.reason = reason;
+        this.pointsType = pointsType;
+        this.pointsAmount = pointsAmount;
+        this.pointsBalance = pointsBalance;
+        this.sourceType = sourceType;
     }
     
     /**
-     * 积分变动类型枚举
+     * 积分类型常量
      */
-    public enum ChangeType {
-        EARN(1, "获得"),
-        CONSUME(2, "消费"),
-        EXPIRE(3, "过期"),
-        REFUND(4, "退还");
-        
-        private final Integer code;
-        private final String desc;
-        
-        ChangeType(Integer code, String desc) {
-            this.code = code;
-            this.desc = desc;
-        }
-        
-        public Integer getCode() {
-            return code;
-        }
-        
-        public String getDesc() {
-            return desc;
-        }
-        
-        public static ChangeType getByCode(Integer code) {
-            for (ChangeType type : values()) {
-                if (type.getCode().equals(code)) {
-                    return type;
-                }
-            }
-            return null;
-        }
+    public static final class PointsType {
+        /** 获得积分 */
+        public static final Integer EARN = 1;
+        /** 消费积分 */
+        public static final Integer CONSUME = 2;
+        /** 过期积分 */
+        public static final Integer EXPIRE = 3;
+        /** 退还积分 */
+        public static final Integer REFUND = 4;
     }
-    
+
     /**
-     * 积分来源枚举
+     * 来源类型常量
      */
-    public enum Source {
-        ORDER("order", "订单"),
-        ACTIVITY("activity", "活动"),
-        MANUAL("manual", "手动"),
-        SYSTEM("system", "系统");
-        
-        private final String code;
-        private final String desc;
-        
-        Source(String code, String desc) {
-            this.code = code;
-            this.desc = desc;
-        }
-        
-        public String getCode() {
-            return code;
-        }
-        
-        public String getDesc() {
-            return desc;
-        }
-        
-        public static Source getByCode(String code) {
-            for (Source source : values()) {
-                if (source.getCode().equals(code)) {
-                    return source;
-                }
-            }
-            return null;
-        }
+    public static final class SourceType {
+        /** 订单获得 */
+        public static final String ORDER = "order";
+        /** 签到获得 */
+        public static final String SIGN = "sign";
+        /** 活动获得 */
+        public static final String ACTIVITY = "activity";
+        /** 退款退还 */
+        public static final String REFUND = "refund";
+        /** 系统调整 */
+        public static final String SYSTEM = "system";
+        /** 兑换消费 */
+        public static final String EXCHANGE = "exchange";
+    }
+
+    /**
+     * 判断是否为获得积分
+     */
+    public boolean isEarnPoints() {
+        return PointsType.EARN.equals(this.pointsType);
+    }
+
+    /**
+     * 判断是否为消费积分
+     */
+    public boolean isConsumePoints() {
+        return PointsType.CONSUME.equals(this.pointsType);
+    }
+
+    /**
+     * 判断是否已过期
+     */
+    public boolean isExpired() {
+        return expireTime != null && expireTime.isBefore(LocalDateTime.now());
     }
 }

@@ -1,0 +1,485 @@
+package com.msc.service.impl;
+
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.msc.domain.dto.UserLoginDTO;
+import com.msc.domain.dto.UserRegisterDTO;
+import com.msc.domain.entity.User;
+import com.msc.domain.entity.UserLoginLog;
+import com.msc.domain.entity.UserPreference;
+import com.msc.domain.entity.UserProfile;
+import com.msc.domain.vo.UserVO;
+import com.msc.mapper.UserLoginLogMapper;
+import com.msc.mapper.UserMapper;
+import com.msc.mapper.UserPreferenceMapper;
+import com.msc.mapper.UserProfileMapper;
+import com.msc.service.UserAuthService;
+import com.msc.service.VerifyCodeService;
+import com.msc.util.JwtUtil;
+import com.msc.util.PasswordUtil;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.BeanUtils;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
+
+import java.time.LocalDateTime;
+import java.util.concurrent.TimeUnit;
+import java.util.regex.Pattern;
+
+/**
+ * 用户认证服务实现类
+ * 
+ * @since 1.0.0
+ */
+@Slf4j
+@Service
+public class UserAuthServiceImpl implements UserAuthService {
+
+    @Autowired
+    private UserMapper userMapper;
+
+    @Autowired
+    private UserProfileMapper userProfileMapper;
+
+    @Autowired
+    private UserPreferenceMapper userPreferenceMapper;
+
+    @Autowired
+    private UserLoginLogMapper userLoginLogMapper;
+
+    @Autowired
+    private VerifyCodeService verifyCodeService;
+
+    @Autowired
+    private JwtUtil jwtUtil;
+
+    @Autowired
+    private StringRedisTemplate redisTemplate;
+
+    private static final String TOKEN_BLACKLIST_PREFIX = "token_blacklist:";
+    private static final Pattern PHONE_PATTERN = Pattern.compile("^1[3-9]\\d{9}$");
+    private static final Pattern EMAIL_PATTERN = Pattern.compile("^[A-Za-z0-9+_.-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$");
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public UserVO register(UserRegisterDTO registerDTO) {
+        // 验证输入参数
+        validateRegisterDTO(registerDTO);
+
+        // 验证验证码
+        if (!verifyCodeService.verifyCode(getAccountFromRegisterDTO(registerDTO), 
+                                         registerDTO.getVerifyCode(), "register")) {
+            throw new RuntimeException("验证码错误或已过期");
+        }
+
+        // 检查用户名是否已存在
+        if (!checkUsernameAvailable(registerDTO.getUsername())) {
+            throw new RuntimeException("用户名已存在");
+        }
+
+        // 检查邮箱是否已存在
+        if (StringUtils.hasText(registerDTO.getEmail()) && !checkEmailAvailable(registerDTO.getEmail())) {
+            throw new RuntimeException("邮箱已被注册");
+        }
+
+        // 检查手机号是否已存在
+        if (StringUtils.hasText(registerDTO.getPhone()) && !checkPhoneAvailable(registerDTO.getPhone())) {
+            throw new RuntimeException("手机号已被注册");
+        }
+
+        // 创建用户
+        User user = new User();
+        user.setUsername(registerDTO.getUsername());
+        user.setPassword(PasswordUtil.encode(registerDTO.getPassword()));
+        user.setEmail(registerDTO.getEmail());
+        user.setPhone(registerDTO.getPhone());
+        user.setNickname(registerDTO.getNickname());
+        user.setGender(registerDTO.getGender());
+        user.setBirthday(registerDTO.getBirthday());
+        user.setRegisterSource(registerDTO.getRegisterSource());
+        user.setRegisterIp(getClientIp());
+        
+        userMapper.insert(user);
+
+        // 创建用户详细资料
+        UserProfile userProfile = new UserProfile();
+        userProfile.setUserId(user.getId());
+        userProfileMapper.insert(userProfile);
+
+        // 创建用户偏好设置
+        UserPreference userPreference = new UserPreference(user.getId());
+        userPreferenceMapper.insert(userPreference);
+
+        // 记录登录日志
+        recordLoginLog(user.getId(), "web", "Browser", 1);
+
+        // 转换为VO并返回
+        UserVO userVO = convertToUserVO(user);
+        
+        // 生成Token
+        String accessToken = jwtUtil.generateAccessToken(user.getId(), user.getUsername());
+        String refreshToken = jwtUtil.generateRefreshToken(user.getId(), user.getUsername());
+        
+        // 注意：实际项目中Token应该通过响应头或其他方式返回，这里仅作演示
+        log.info("Generated tokens for user: {}", user.getUsername());
+
+        log.info("User registered successfully: {}", user.getUsername());
+        return userVO;
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public UserVO login(UserLoginDTO loginDTO) {
+        // 验证输入参数
+        validateLoginDTO(loginDTO);
+
+        // 根据登录类型验证
+        User user = null;
+        if ("password".equals(loginDTO.getLoginType())) {
+            user = loginWithPassword(loginDTO);
+        } else if ("sms".equals(loginDTO.getLoginType())) {
+            user = loginWithSms(loginDTO);
+        } else {
+            throw new RuntimeException("不支持的登录类型");
+        }
+
+        if (user == null) {
+            throw new RuntimeException("登录失败");
+        }
+
+        // 检查用户状态
+        if (Integer.valueOf(0).equals(user.getStatus())) {
+            throw new RuntimeException("账号已被禁用");
+        }
+
+        // 更新登录信息
+        user.setLastLoginTime(LocalDateTime.now());
+        user.setLastLoginIp(getClientIp());
+        userMapper.updateById(user);
+
+        // 记录登录日志
+        recordLoginLog(user.getId(), "web", "Browser", 1);
+
+        // 转换为VO并返回
+        UserVO userVO = convertToUserVO(user);
+        
+        // 生成Token
+        String accessToken = jwtUtil.generateAccessToken(user.getId(), user.getUsername());
+        String refreshToken = jwtUtil.generateRefreshToken(user.getId(), user.getUsername());
+        
+        // 注意：实际项目中Token应该通过响应头或其他方式返回，这里仅作演示
+        log.info("Generated tokens for user: {}", user.getUsername());
+
+        log.info("User logged in successfully: {}", user.getUsername());
+        return userVO;
+    }
+
+    @Override
+    public Boolean logout(Long userId, String token) {
+        try {
+            // 将Token加入黑名单
+            Long remainingTime = jwtUtil.getTokenRemainingTime(token);
+            if (remainingTime > 0) {
+                String key = TOKEN_BLACKLIST_PREFIX + token;
+                redisTemplate.opsForValue().set(key, "1", remainingTime, TimeUnit.SECONDS);
+            }
+
+            log.info("User logged out successfully: {}", userId);
+            return true;
+        } catch (Exception e) {
+            log.error("Logout failed for user: {}", userId, e);
+            return false;
+        }
+    }
+
+    @Override
+    public String refreshToken(String refreshToken) {
+        if (!jwtUtil.validateRefreshToken(refreshToken)) {
+            throw new RuntimeException("刷新令牌无效或已过期");
+        }
+
+        Long userId = jwtUtil.getUserIdFromToken(refreshToken);
+        String username = jwtUtil.getUsernameFromToken(refreshToken);
+
+        // 验证用户是否存在且状态正常
+        User user = userMapper.selectById(userId);
+        if (user == null || Integer.valueOf(0).equals(user.getStatus())) {
+            throw new RuntimeException("用户不存在或已被禁用");
+        }
+
+        // 生成新的访问Token
+        return jwtUtil.generateAccessToken(userId, username);
+    }
+
+    @Override
+    public UserVO validateToken(String token) {
+        if (!jwtUtil.validateAccessToken(token)) {
+            return null;
+        }
+
+        // 检查Token是否在黑名单中
+        String key = TOKEN_BLACKLIST_PREFIX + token;
+        if (redisTemplate.hasKey(key)) {
+            return null;
+        }
+
+        Long userId = jwtUtil.getUserIdFromToken(token);
+        User user = userMapper.selectById(userId);
+        
+        if (user == null || Integer.valueOf(0).equals(user.getStatus())) {
+            return null;
+        }
+
+        return convertToUserVO(user);
+    }
+
+    @Override
+    public Boolean sendVerifyCode(String account, String type) {
+        if (isPhoneNumber(account)) {
+            return verifyCodeService.sendSmsCode(account, type);
+        } else if (isEmail(account)) {
+            return verifyCodeService.sendEmailCode(account, type);
+        } else {
+            throw new RuntimeException("账号格式不正确");
+        }
+    }
+
+    @Override
+    public Boolean verifyCode(String account, String code, String type) {
+        return verifyCodeService.verifyCode(account, code, type);
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public Boolean resetPassword(String account, String newPassword, String verifyCode) {
+        // 验证验证码
+        if (!verifyCodeService.verifyCode(account, verifyCode, "reset")) {
+            throw new RuntimeException("验证码错误或已过期");
+        }
+
+        // 验证密码格式
+        if (!PasswordUtil.isValidPassword(newPassword)) {
+            throw new RuntimeException("密码格式不符合要求");
+        }
+
+        // 查找用户
+        User user = findUserByAccount(account);
+        if (user == null) {
+            throw new RuntimeException("用户不存在");
+        }
+
+        // 更新密码
+        user.setPassword(PasswordUtil.encode(newPassword));
+        user.setUpdateTime(LocalDateTime.now());
+        
+        int result = userMapper.updateById(user);
+        
+        log.info("Password reset successfully for user: {}", user.getUsername());
+        return result > 0;
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public Boolean changePassword(Long userId, String oldPassword, String newPassword) {
+        // 验证新密码格式
+        if (!PasswordUtil.isValidPassword(newPassword)) {
+            throw new RuntimeException("新密码格式不符合要求");
+        }
+
+        // 查找用户
+        User user = userMapper.selectById(userId);
+        if (user == null) {
+            throw new RuntimeException("用户不存在");
+        }
+
+        // 验证旧密码
+        if (!PasswordUtil.matches(oldPassword, user.getPassword())) {
+            throw new RuntimeException("原密码错误");
+        }
+
+        // 更新密码
+        user.setPassword(PasswordUtil.encode(newPassword));
+        user.setUpdateTime(LocalDateTime.now());
+        
+        int result = userMapper.updateById(user);
+        
+        log.info("Password changed successfully for user: {}", user.getUsername());
+        return result > 0;
+    }
+
+    @Override
+    public Boolean checkUsernameAvailable(String username) {
+        LambdaQueryWrapper<User> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(User::getUsername, username);
+        return userMapper.selectCount(wrapper) == 0;
+    }
+
+    @Override
+    public Boolean checkEmailAvailable(String email) {
+        LambdaQueryWrapper<User> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(User::getEmail, email);
+        return userMapper.selectCount(wrapper) == 0;
+    }
+
+    @Override
+    public Boolean checkPhoneAvailable(String phone) {
+        LambdaQueryWrapper<User> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(User::getPhone, phone);
+        return userMapper.selectCount(wrapper) == 0;
+    }
+
+    /**
+     * 密码登录
+     */
+    private User loginWithPassword(UserLoginDTO loginDTO) {
+        User user = findUserByAccount(loginDTO.getAccount());
+        if (user == null) {
+            throw new RuntimeException("用户不存在");
+        }
+
+        if (!PasswordUtil.matches(loginDTO.getPassword(), user.getPassword())) {
+            throw new RuntimeException("密码错误");
+        }
+
+        return user;
+    }
+
+    /**
+     * 短信验证码登录
+     */
+    private User loginWithSms(UserLoginDTO loginDTO) {
+        if (!verifyCodeService.verifyCode(loginDTO.getAccount(), 
+                                         loginDTO.getVerifyCode(), "login")) {
+            throw new RuntimeException("验证码错误或已过期");
+        }
+
+        User user = findUserByAccount(loginDTO.getAccount());
+        if (user == null) {
+            throw new RuntimeException("用户不存在");
+        }
+
+        return user;
+    }
+
+    /**
+     * 根据账号查找用户
+     */
+    private User findUserByAccount(String account) {
+        LambdaQueryWrapper<User> wrapper = new LambdaQueryWrapper<>();
+        
+        if (isPhoneNumber(account)) {
+            wrapper.eq(User::getPhone, account);
+        } else if (isEmail(account)) {
+            wrapper.eq(User::getEmail, account);
+        } else {
+            wrapper.eq(User::getUsername, account);
+        }
+        
+        return userMapper.selectOne(wrapper);
+    }
+
+    /**
+     * 记录登录日志
+     */
+    private void recordLoginLog(Long userId, String deviceType, String deviceInfo, Integer loginType) {
+        UserLoginLog loginLog = UserLoginLog.builder()
+                .userId(userId)
+                .loginIp(getClientIp())
+                .deviceType(deviceType)
+                .deviceInfo(deviceInfo)
+                .loginType(loginType)
+                .loginStatus(1)
+                .loginTime(LocalDateTime.now())
+                .build();
+        
+        userLoginLogMapper.insert(loginLog);
+    }
+
+    /**
+     * 转换为UserVO
+     */
+    private UserVO convertToUserVO(User user) {
+        UserVO userVO = new UserVO();
+        BeanUtils.copyProperties(user, userVO);
+        return userVO;
+    }
+
+    /**
+     * 验证注册DTO
+     */
+    private void validateRegisterDTO(UserRegisterDTO registerDTO) {
+        if (!StringUtils.hasText(registerDTO.getUsername())) {
+            throw new RuntimeException("用户名不能为空");
+        }
+        
+        if (!StringUtils.hasText(registerDTO.getPassword())) {
+            throw new RuntimeException("密码不能为空");
+        }
+        
+        if (!registerDTO.getPassword().equals(registerDTO.getConfirmPassword())) {
+            throw new RuntimeException("两次输入的密码不一致");
+        }
+        
+        if (!PasswordUtil.isValidPassword(registerDTO.getPassword())) {
+            throw new RuntimeException("密码格式不符合要求");
+        }
+        
+        if (!StringUtils.hasText(registerDTO.getVerifyCode())) {
+            throw new RuntimeException("验证码不能为空");
+        }
+    }
+
+    /**
+     * 验证登录DTO
+     */
+    private void validateLoginDTO(UserLoginDTO loginDTO) {
+        if (!StringUtils.hasText(loginDTO.getAccount())) {
+            throw new RuntimeException("账号不能为空");
+        }
+        
+        if ("password".equals(loginDTO.getLoginType()) && !StringUtils.hasText(loginDTO.getPassword())) {
+            throw new RuntimeException("密码不能为空");
+        }
+        
+        if ("sms".equals(loginDTO.getLoginType()) && !StringUtils.hasText(loginDTO.getVerifyCode())) {
+            throw new RuntimeException("验证码不能为空");
+        }
+    }
+
+    /**
+     * 从注册DTO获取账号
+     */
+    private String getAccountFromRegisterDTO(UserRegisterDTO registerDTO) {
+        if (StringUtils.hasText(registerDTO.getPhone())) {
+            return registerDTO.getPhone();
+        } else if (StringUtils.hasText(registerDTO.getEmail())) {
+            return registerDTO.getEmail();
+        } else {
+            throw new RuntimeException("手机号或邮箱不能为空");
+        }
+    }
+
+    /**
+     * 判断是否为手机号
+     */
+    private boolean isPhoneNumber(String account) {
+        return PHONE_PATTERN.matcher(account).matches();
+    }
+
+    /**
+     * 判断是否为邮箱
+     */
+    private boolean isEmail(String account) {
+        return EMAIL_PATTERN.matcher(account).matches();
+    }
+
+    /**
+     * 获取客户端IP（简化实现）
+     */
+    private String getClientIp() {
+        // TODO: 从HttpServletRequest中获取真实IP
+        return "127.0.0.1";
+    }
+}

@@ -1,11 +1,13 @@
 package com.msc.domain.entity;
 
-import java.time.LocalDateTime;
-
+import com.baomidou.mybatisplus.annotation.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import lombok.EqualsAndHashCode;
+
+import java.time.LocalDateTime;
 
 /**
  * 用户第三方授权实体类
@@ -14,178 +16,138 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
+@EqualsAndHashCode(callSuper = false)
+@TableName("user_oauth")
 public class UserOauth {
     
     /**
-     * 授权ID
+     * 绑定ID
      */
+    @TableId(value = "id", type = IdType.AUTO)
     private Long id;
     
     /**
      * 用户ID
      */
+    @TableField("user_id")
     private Long userId;
     
     /**
-     * 第三方平台:wechat,qq,weibo,alipay等
+     * 第三方类型:wechat,alipay,qq,weibo
      */
-    private String platform;
+    @TableField("oauth_type")
+    private String oauthType;
     
     /**
      * 第三方用户ID
      */
-    private String openId;
+    @TableField("oauth_id")
+    private String oauthId;
     
     /**
-     * 第三方统一用户ID
+     * 第三方用户名
      */
-    private String unionId;
+    @TableField("oauth_name")
+    private String oauthName;
     
     /**
-     * 第三方用户昵称
+     * 第三方头像
      */
-    private String nickname;
-    
-    /**
-     * 第三方用户头像
-     */
-    private String avatar;
-    
-    /**
-     * 第三方用户性别:0-未知,1-男,2-女
-     */
-    private Integer gender;
-    
-    /**
-     * 第三方用户城市
-     */
-    private String city;
-    
-    /**
-     * 第三方用户省份
-     */
-    private String province;
-    
-    /**
-     * 第三方用户国家
-     */
-    private String country;
+    @TableField("oauth_avatar")
+    private String oauthAvatar;
     
     /**
      * 访问令牌
      */
+    @TableField("access_token")
     private String accessToken;
     
     /**
      * 刷新令牌
      */
+    @TableField("refresh_token")
     private String refreshToken;
     
     /**
-     * 令牌过期时间
+     * 令牌过期时间(秒)
      */
-    private LocalDateTime tokenExpireTime;
+    @TableField("expires_in")
+    private Integer expiresIn;
     
     /**
-     * 是否绑定:0-否,1-是
+     * 开放平台统一ID
      */
-    private Integer bound;
+    @TableField("union_id")
+    private String unionId;
+    
+    /**
+     * 额外信息(JSON格式)
+     */
+    @TableField("extra_info")
+    private String extraInfo;
     
     /**
      * 绑定时间
      */
+    @TableField(value = "bind_time", fill = FieldFill.INSERT)
     private LocalDateTime bindTime;
-    
-    /**
-     * 解绑时间
-     */
-    private LocalDateTime unbindTime;
-    
-    /**
-     * 创建时间
-     */
-    private LocalDateTime createTime;
     
     /**
      * 更新时间
      */
+    @TableField(value = "update_time", fill = FieldFill.INSERT_UPDATE)
     private LocalDateTime updateTime;
     
-    // 自定义构造方法
-    public UserOauth(Long userId, String platform, String openId) {
+    /**
+     * 自定义构造方法
+     */
+    public UserOauth(Long userId, String oauthType, String oauthId) {
         this.userId = userId;
-        this.platform = platform;
-        this.openId = openId;
-        this.bound = 1;
+        this.oauthType = oauthType;
+        this.oauthId = oauthId;
         this.bindTime = LocalDateTime.now();
     }
     
     /**
-     * 第三方平台枚举
+     * 第三方类型常量
      */
-    public enum Platform {
-        WECHAT("wechat", "微信"),
-        QQ("qq", "QQ"),
-        WEIBO("weibo", "微博"),
-        ALIPAY("alipay", "支付宝"),
-        APPLE("apple", "苹果");
-        
-        private final String code;
-        private final String desc;
-        
-        Platform(String code, String desc) {
-            this.code = code;
-            this.desc = desc;
-        }
-        
-        public String getCode() {
-            return code;
-        }
-        
-        public String getDesc() {
-            return desc;
-        }
-        
-        public static Platform getByCode(String code) {
-            for (Platform platform : values()) {
-                if (platform.getCode().equals(code)) {
-                    return platform;
-                }
-            }
-            return null;
-        }
+    public static final class OauthType {
+        /** 微信 */
+        public static final String WECHAT = "wechat";
+        /** 支付宝 */
+        public static final String ALIPAY = "alipay";
+        /** QQ */
+        public static final String QQ = "qq";
+        /** 微博 */
+        public static final String WEIBO = "weibo";
     }
     
     /**
-     * 绑定账号
+     * 更新令牌信息
      */
-    public void bind() {
-        this.bound = 1;
-        this.bindTime = LocalDateTime.now();
-        this.unbindTime = null;
-    }
-    
-    /**
-     * 解绑账号
-     */
-    public void unbind() {
-        this.bound = 0;
-        this.unbindTime = LocalDateTime.now();
-    }
-    
-    /**
-     * 更新令牌
-     */
-    public void updateToken(String accessToken, String refreshToken, LocalDateTime expireTime) {
+    public void updateToken(String accessToken, String refreshToken, Integer expiresIn) {
         this.accessToken = accessToken;
         this.refreshToken = refreshToken;
-        this.tokenExpireTime = expireTime;
+        this.expiresIn = expiresIn;
+        this.updateTime = LocalDateTime.now();
     }
     
     /**
      * 检查令牌是否过期
      */
     public boolean isTokenExpired() {
-        return tokenExpireTime != null && LocalDateTime.now().isAfter(tokenExpireTime);
+        if (expiresIn == null || bindTime == null) {
+            return false;
+        }
+        LocalDateTime expireTime = bindTime.plusSeconds(expiresIn);
+        return LocalDateTime.now().isAfter(expireTime);
+    }
+    
+    /**
+     * 更新额外信息
+     */
+    public void updateExtraInfo(String extraInfo) {
+        this.extraInfo = extraInfo;
+        this.updateTime = LocalDateTime.now();
     }
 }

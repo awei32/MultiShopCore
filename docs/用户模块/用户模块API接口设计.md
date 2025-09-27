@@ -208,7 +208,163 @@ Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
 }
 ```
 
-### 2.5 发送验证码
+### 2.5 第三方登录授权
+
+**接口地址：** `GET /api/v1/auth/oauth/{provider}/authorize`
+
+**接口描述：** 获取第三方登录授权URL
+
+**路径参数：**
+
+| 参数名 | 类型 | 必填 | 说明 |
+|--------|------|------|------|
+| provider | string | 是 | 第三方平台：wechat/qq/alipay/weibo |
+
+**请求参数：**
+
+| 参数名 | 类型 | 必填 | 说明 |
+|--------|------|------|------|
+| redirectUri | string | 否 | 回调地址 |
+| state | string | 否 | 状态参数 |
+
+**响应示例：**
+
+```json
+{
+  "code": 200,
+  "message": "获取成功",
+  "data": {
+    "authorizeUrl": "https://open.weixin.qq.com/connect/oauth2/authorize?appid=xxx&redirect_uri=xxx&response_type=code&scope=snsapi_userinfo&state=xxx",
+    "state": "oauth_state_123"
+  },
+  "timestamp": 1640995200000,
+  "requestId": "req_123456789"
+}
+```
+
+### 2.6 第三方登录回调
+
+**接口地址：** `POST /api/v1/auth/oauth/{provider}/callback`
+
+**接口描述：** 处理第三方登录回调，完成登录或绑定
+
+**路径参数：**
+
+| 参数名 | 类型 | 必填 | 说明 |
+|--------|------|------|------|
+| provider | string | 是 | 第三方平台：wechat/qq/alipay/weibo |
+
+**请求参数：**
+
+```json
+{
+  "code": "oauth_code_123",
+  "state": "oauth_state_123",
+  "action": "login"
+}
+```
+
+**参数说明：**
+
+| 参数名 | 类型 | 必填 | 说明 |
+|--------|------|------|------|
+| code | string | 是 | 授权码 |
+| state | string | 是 | 状态参数 |
+| action | string | 是 | 操作类型：login/bind |
+
+**响应示例（登录成功）：**
+
+```json
+{
+  "code": 200,
+  "message": "登录成功",
+  "data": {
+    "userId": 123456,
+    "username": "wx_user_123",
+    "nickname": "微信用户",
+    "avatar": "https://thirdwx.qlogo.cn/mmopen/xxx",
+    "memberLevel": 1,
+    "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+    "refreshToken": "refresh_token_123",
+    "expiresIn": 7200,
+    "isNewUser": false
+  },
+  "timestamp": 1640995200000,
+  "requestId": "req_123456789"
+}
+```
+
+**响应示例（需要绑定手机号）：**
+
+```json
+{
+  "code": 1001,
+  "message": "需要绑定手机号",
+  "data": {
+    "oauthToken": "oauth_temp_token_123",
+    "userInfo": {
+      "openId": "oauth_openid_123",
+      "unionId": "oauth_unionid_123",
+      "nickname": "微信用户",
+      "avatar": "https://thirdwx.qlogo.cn/mmopen/xxx",
+      "gender": 1
+    }
+  },
+  "timestamp": 1640995200000,
+  "requestId": "req_123456789"
+}
+```
+
+### 2.7 第三方账号绑定手机号
+
+**接口地址：** `POST /api/v1/auth/oauth/bind-phone`
+
+**接口描述：** 第三方登录时绑定手机号完成注册
+
+**请求参数：**
+
+```json
+{
+  "oauthToken": "oauth_temp_token_123",
+  "phone": "13800138000",
+  "smsCode": "123456",
+  "agreeTerms": true
+}
+```
+
+**参数说明：**
+
+| 参数名 | 类型 | 必填 | 说明 |
+|--------|------|------|------|
+| oauthToken | string | 是 | 第三方临时token |
+| phone | string | 是 | 手机号 |
+| smsCode | string | 是 | 短信验证码 |
+| agreeTerms | boolean | 是 | 是否同意用户协议 |
+
+**响应示例：**
+
+```json
+{
+  "code": 200,
+  "message": "绑定成功",
+  "data": {
+    "userId": 123456,
+    "username": "wx_user_123",
+    "nickname": "微信用户",
+    "avatar": "https://thirdwx.qlogo.cn/mmopen/xxx",
+    "phone": "13800138000",
+    "memberLevel": 1,
+    "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+    "refreshToken": "refresh_token_123",
+    "expiresIn": 7200,
+    "isNewUser": true
+  },
+  "timestamp": 1640995200000,
+  "requestId": "req_123456789"
+}
+```
+
+### 2.8 发送验证码
 
 **接口地址：** `POST /api/v1/auth/captcha/send`
 
@@ -280,12 +436,27 @@ Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
     "phone": "13800138000",
     "gender": 1,
     "birthday": "1990-01-01",
+    "bio": "这是我的个人简介",
     "memberLevel": 2,
-    "memberLevelName": "银牌会员",
-    "totalAmount": 5000.00,
+    "memberLevelName": "白银会员",
+    "totalAmount": 2500.00,
     "totalPoints": 1000,
     "availablePoints": 800,
-    "isVerified": true,
+    "isEmailVerified": true,
+    "isPhoneVerified": true,
+    "realNameVerify": {
+      "isVerified": true,
+      "status": "approved",
+      "statusName": "已认证",
+      "realName": "张**",
+      "submitTime": "2024-01-01 15:30:00"
+    },
+    "accountSecurity": {
+      "securityLevel": "high",
+      "securityScore": 85,
+      "hasPayPassword": true,
+      "twoFactorEnabled": false
+    },
     "registerTime": "2023-01-01 10:00:00",
     "lastLoginTime": "2024-01-01 15:30:00"
   },
@@ -431,6 +602,268 @@ Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
   "message": "邮箱绑定成功",
   "data": {
     "email": "newemail@example.com"
+  },
+  "timestamp": 1640995200000,
+  "requestId": "req_123456789"
+}
+```
+
+### 3.6 获取第三方账号绑定列表
+
+**接口地址：** `GET /api/v1/user/oauth/list`
+
+**接口描述：** 获取当前用户已绑定的第三方账号列表
+
+**请求头：**
+```
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+```
+
+**响应示例：**
+
+```json
+{
+  "code": 200,
+  "message": "获取成功",
+  "data": [
+    {
+      "id": 1,
+      "provider": "wechat",
+      "providerName": "微信",
+      "openId": "oauth_openid_123",
+      "unionId": "oauth_unionid_123",
+      "nickname": "微信用户",
+      "avatar": "https://thirdwx.qlogo.cn/mmopen/xxx",
+      "bindTime": "2024-01-01 10:00:00",
+      "lastLoginTime": "2024-01-15 15:30:00",
+      "status": "active"
+    },
+    {
+      "id": 2,
+      "provider": "qq",
+      "providerName": "QQ",
+      "openId": "qq_openid_456",
+      "unionId": null,
+      "nickname": "QQ用户",
+      "avatar": "https://q.qlogo.cn/qqapp/xxx",
+      "bindTime": "2024-01-05 14:20:00",
+      "lastLoginTime": null,
+      "status": "active"
+    }
+  ],
+  "timestamp": 1640995200000,
+  "requestId": "req_123456789"
+}
+```
+
+### 3.7 绑定第三方账号
+
+**接口地址：** `POST /api/v1/user/oauth/bind`
+
+**接口描述：** 绑定第三方账号到当前用户
+
+**请求头：**
+```
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+```
+
+**请求参数：**
+
+```json
+{
+  "provider": "wechat",
+  "code": "oauth_code_123",
+  "state": "oauth_state_123"
+}
+```
+
+**参数说明：**
+
+| 参数名 | 类型 | 必填 | 说明 |
+|--------|------|------|------|
+| provider | string | 是 | 第三方平台：wechat/qq/alipay/weibo |
+| code | string | 是 | 授权码 |
+| state | string | 是 | 状态参数 |
+
+**响应示例：**
+
+```json
+{
+  "code": 200,
+  "message": "绑定成功",
+  "data": {
+    "id": 3,
+    "provider": "wechat",
+    "providerName": "微信",
+    "openId": "oauth_openid_789",
+    "unionId": "oauth_unionid_789",
+    "nickname": "新微信用户",
+    "avatar": "https://thirdwx.qlogo.cn/mmopen/yyy",
+    "bindTime": "2024-01-20 16:45:00",
+    "status": "active"
+  },
+  "timestamp": 1640995200000,
+  "requestId": "req_123456789"
+}
+```
+
+### 3.8 解绑第三方账号
+
+**接口地址：** `DELETE /api/v1/user/oauth/{oauthId}`
+
+**接口描述：** 解绑指定的第三方账号
+
+**请求头：**
+```
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+```
+
+**路径参数：**
+
+| 参数名 | 类型 | 必填 | 说明 |
+|--------|------|------|------|
+| oauthId | integer | 是 | 第三方账号ID |
+
+**响应示例：**
+
+```json
+{
+  "code": 200,
+  "message": "解绑成功",
+  "data": null,
+  "timestamp": 1640995200000,
+  "requestId": "req_123456789"
+}
+```
+
+**错误响应示例：**
+
+```json
+{
+  "code": 4003,
+  "message": "无法解绑，至少需要保留一种登录方式",
+  "data": null,
+  "timestamp": 1640995200000,
+  "requestId": "req_123456789"
+}
+```
+
+### 3.9 实名认证
+
+**接口地址：** `POST /api/v1/user/realname/verify`
+
+**接口描述：** 提交实名认证信息
+
+**实名认证说明：**
+- 实名认证后可享受更高的交易限额和安全保障
+- 每个身份证号只能认证一个账户
+- 认证信息一旦提交不可修改，请确保信息准确
+- 认证通常在1-3个工作日内完成审核
+
+**请求参数：**
+
+```json
+{
+  "realName": "张三",
+  "idCard": "110101199001011234",
+  "idCardFront": "https://cdn.example.com/idcard_front.jpg",
+  "idCardBack": "https://cdn.example.com/idcard_back.jpg",
+  "facePhoto": "https://cdn.example.com/face_photo.jpg"
+}
+```
+
+**参数说明：**
+
+| 参数名 | 类型 | 必填 | 说明 |
+|--------|------|------|------|
+| realName | string | 是 | 真实姓名，2-20位中文字符 |
+| idCard | string | 是 | 身份证号码，18位 |
+| idCardFront | string | 是 | 身份证正面照片URL |
+| idCardBack | string | 是 | 身份证反面照片URL |
+| facePhoto | string | 是 | 手持身份证照片URL |
+
+**响应示例：**
+
+```json
+{
+  "code": 200,
+  "message": "实名认证信息提交成功",
+  "data": {
+    "verifyId": "VER202401010001",
+    "status": "pending",
+    "statusName": "审核中",
+    "submitTime": "2024-01-01 15:30:00",
+    "estimatedTime": "1-3个工作日"
+  },
+  "timestamp": 1640995200000,
+  "requestId": "req_123456789"
+}
+```
+
+### 3.7 获取实名认证状态
+
+**接口地址：** `GET /api/v1/user/realname/status`
+
+**接口描述：** 获取用户实名认证状态
+
+**响应示例：**
+
+```json
+{
+  "code": 200,
+  "message": "获取成功",
+  "data": {
+    "isVerified": true,
+    "verifyId": "VER202401010001",
+    "status": "approved",
+    "statusName": "已认证",
+    "realName": "张**",
+    "idCard": "110101********1234",
+    "submitTime": "2024-01-01 15:30:00",
+    "approveTime": "2024-01-02 10:00:00",
+    "rejectReason": null,
+    "canResubmit": false,
+    "benefits": [
+      "提升账户安全等级",
+      "享受更高交易限额",
+      "优先客服支持",
+      "参与高级会员活动"
+    ]
+  },
+  "timestamp": 1640995200000,
+  "requestId": "req_123456789"
+}
+```
+
+**状态说明：**
+
+| 状态值 | 状态名称 | 说明 |
+|--------|----------|------|
+| not_submitted | 未提交 | 尚未提交实名认证 |
+| pending | 审核中 | 已提交，等待审核 |
+| approved | 已认证 | 审核通过，实名认证成功 |
+| rejected | 审核失败 | 审核未通过，可重新提交 |
+
+### 3.8 重新提交实名认证
+
+**接口地址：** `PUT /api/v1/user/realname/resubmit`
+
+**接口描述：** 重新提交实名认证信息（仅在审核失败时可用）
+
+**请求参数：** 同3.6接口
+
+**响应示例：**
+
+```json
+{
+  "code": 200,
+  "message": "实名认证信息重新提交成功",
+  "data": {
+    "verifyId": "VER202401020001",
+    "status": "pending",
+    "statusName": "审核中",
+    "submitTime": "2024-01-02 15:30:00",
+    "estimatedTime": "1-3个工作日"
   },
   "timestamp": 1640995200000,
   "requestId": "req_123456789"
@@ -642,6 +1075,21 @@ Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
 
 **接口描述：** 获取用户积分信息
 
+**积分规则说明：**
+- **积分获取规则：**
+  - 购物返积分：消费1元=1积分
+  - 签到积分：每日签到获得5积分
+  - 评价积分：完成商品评价获得10积分
+  - 邀请好友：成功邀请好友注册获得50积分
+- **积分使用规则：**
+  - 积分抵扣现金：100积分=1元
+  - 单笔订单最多可使用积分抵扣50%金额
+  - 积分不可转让，仅限本人使用
+- **积分有效期：**
+  - 积分有效期为2年
+  - 到期前1个月系统会发送提醒通知
+  - 过期积分将自动清零
+
 **响应示例：**
 
 ```json
@@ -652,17 +1100,37 @@ Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
     "totalPoints": 1000,
     "availablePoints": 800,
     "usedPoints": 200,
-    "expiredPoints": 0,
+    "expiredPoints": 50,
+    "frozenPoints": 0,
     "memberLevel": 2,
-    "memberLevelName": "银牌会员",
-    "nextLevelPoints": 1500,
-    "nextLevelName": "金牌会员",
-    "levelProgress": 53.33
+    "memberLevelName": "白银会员",
+    "nextLevelPoints": 5000,
+    "nextLevelName": "黄金会员",
+    "levelProgress": 20.0,
+    "pointsExpiringSoon": 100,
+    "pointsExpiryDate": "2024-12-31"
   },
   "timestamp": 1640995200000,
   "requestId": "req_123456789"
 }
 ```
+
+**响应参数说明：**
+
+| 参数名 | 类型 | 说明 |
+|--------|------|------|
+| totalPoints | integer | 累计获得积分总数 |
+| availablePoints | integer | 当前可用积分 |
+| usedPoints | integer | 已使用积分总数 |
+| expiredPoints | integer | 已过期积分总数 |
+| frozenPoints | integer | 冻结积分（退款等待期） |
+| memberLevel | integer | 会员等级：1-普通,2-白银,3-黄金 |
+| memberLevelName | string | 会员等级名称 |
+| nextLevelPoints | integer | 升级到下一等级所需消费金额 |
+| nextLevelName | string | 下一等级名称 |
+| levelProgress | decimal | 当前等级进度百分比 |
+| pointsExpiringSoon | integer | 即将过期积分（30天内） |
+| pointsExpiryDate | string | 最近过期日期 |
 
 ### 5.2 获取积分记录
 
@@ -675,6 +1143,7 @@ Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
 | 参数名 | 类型 | 必填 | 说明 |
 |--------|------|------|------|
 | pointsType | integer | 否 | 积分类型：1-获得,2-消费,3-过期,4-退还 |
+| sourceType | string | 否 | 来源类型：order,signin,review,invite,refund |
 | startTime | string | 否 | 开始时间，格式：YYYY-MM-DD |
 | endTime | string | 否 | 结束时间，格式：YYYY-MM-DD |
 | page | integer | 否 | 页码，默认1 |
@@ -695,14 +1164,51 @@ Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
         "pointsAmount": 100,
         "pointsBalance": 900,
         "sourceType": "order",
+        "sourceId": "ORD202401010001",
         "sourceTypeName": "订单消费",
         "description": "订单消费获得积分",
-        "createTime": "2024-01-01 15:30:00"
+        "expireTime": "2026-01-01 15:30:00",
+        "createTime": "2024-01-01 15:30:00",
+        "remark": "订单号：ORD202401010001，消费金额：100元"
+      },
+      {
+        "logId": 2,
+        "pointsType": 1,
+        "pointsTypeName": "获得",
+        "pointsAmount": 5,
+        "pointsBalance": 905,
+        "sourceType": "signin",
+        "sourceId": null,
+        "sourceTypeName": "每日签到",
+        "description": "每日签到获得积分",
+        "expireTime": "2026-01-02 10:00:00",
+        "createTime": "2024-01-02 10:00:00",
+        "remark": "连续签到第3天"
+      },
+      {
+        "logId": 3,
+        "pointsType": 2,
+        "pointsTypeName": "消费",
+        "pointsAmount": -50,
+        "pointsBalance": 855,
+        "sourceType": "order",
+        "sourceId": "ORD202401020001",
+        "sourceTypeName": "积分抵扣",
+        "description": "订单使用积分抵扣",
+        "expireTime": null,
+        "createTime": "2024-01-02 14:30:00",
+        "remark": "抵扣金额：0.5元"
       }
     ],
     "total": 20,
     "page": 1,
-    "size": 10
+    "size": 10,
+    "summary": {
+      "totalEarned": 1500,
+      "totalUsed": 300,
+      "totalExpired": 50,
+      "currentBalance": 855
+    }
   },
   "timestamp": 1640995200000,
   "requestId": "req_123456789"
@@ -715,6 +1221,11 @@ Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
 
 **接口描述：** 获取所有会员等级信息
 
+**会员等级说明：**
+- **普通会员**：累计消费0-999元
+- **白银会员**：累计消费1000-4999元  
+- **黄金会员**：累计消费5000元以上
+
 **响应示例：**
 
 ```json
@@ -724,41 +1235,157 @@ Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
   "data": [
     {
       "levelId": 1,
-      "levelCode": "bronze",
+      "levelCode": "normal",
       "levelName": "普通会员",
       "minAmount": 0,
-      "maxAmount": 999.99,
+      "maxAmount": 999,
       "discountRate": 1.00,
       "pointsRate": 1.00,
       "freeShipping": false,
       "birthdayDiscount": null,
-      "levelIcon": "https://cdn.example.com/bronze.png",
-      "levelColor": "#CD7F32",
+      "levelIcon": "https://cdn.example.com/normal.png",
+      "levelColor": "#8B4513",
+      "description": "享受基础购物服务",
       "privileges": [
         "基础购物权限",
-        "客服支持"
+        "标准客服支持",
+        "正常积分获取"
       ]
     },
     {
       "levelId": 2,
       "levelCode": "silver",
-      "levelName": "银牌会员",
-      "minAmount": 1000.00,
-      "maxAmount": 4999.99,
-      "discountRate": 0.95,
+      "levelName": "白银会员",
+      "minAmount": 1000,
+      "maxAmount": 4999,
+      "discountRate": 0.98,
       "pointsRate": 1.20,
       "freeShipping": false,
-      "birthdayDiscount": 0.90,
+      "birthdayDiscount": 0.95,
       "levelIcon": "https://cdn.example.com/silver.png",
       "levelColor": "#C0C0C0",
+      "description": "享受更多购物优惠和服务",
+      "privileges": [
+        "98折购物优惠",
+        "1.2倍积分奖励",
+        "生日95折优惠",
+        "优先客服支持",
+        "专属客服热线"
+      ]
+    },
+    {
+      "levelId": 3,
+      "levelCode": "gold",
+      "levelName": "黄金会员",
+      "minAmount": 5000,
+      "maxAmount": null,
+      "discountRate": 0.95,
+      "pointsRate": 1.50,
+      "freeShipping": true,
+      "birthdayDiscount": 0.90,
+      "levelIcon": "https://cdn.example.com/gold.png",
+      "levelColor": "#FFD700",
+      "description": "享受最高级别的购物特权",
       "privileges": [
         "95折购物优惠",
-        "1.2倍积分奖励",
+        "1.5倍积分奖励",
+        "免费包邮服务",
         "生日9折优惠",
-        "优先客服支持"
+        "VIP专属客服",
+        "优先发货服务",
+        "专属活动邀请",
+        "年度生日礼品"
       ]
     }
   ],
+  "timestamp": 1640995200000,
+  "requestId": "req_123456789"
+}
+```
+
+### 5.4 积分使用预检
+
+**接口地址：** `POST /api/v1/user/points/check`
+
+**接口描述：** 检查积分是否可用于订单抵扣
+
+**请求参数：**
+
+```json
+{
+  "orderAmount": 100.00,
+  "pointsToUse": 5000
+}
+```
+
+**参数说明：**
+
+| 参数名 | 类型 | 必填 | 说明 |
+|--------|------|------|------|
+| orderAmount | decimal | 是 | 订单金额 |
+| pointsToUse | integer | 是 | 计划使用的积分数量 |
+
+**响应示例：**
+
+```json
+{
+  "code": 200,
+  "message": "检查成功",
+  "data": {
+    "canUse": true,
+    "maxUsablePoints": 5000,
+    "maxDeductAmount": 50.00,
+    "actualUsablePoints": 5000,
+    "actualDeductAmount": 50.00,
+    "remainingPoints": 3000,
+    "pointsRate": 100,
+    "maxDeductRatio": 0.50,
+    "tips": "本次最多可使用5000积分，抵扣50元"
+  },
+  "timestamp": 1640995200000,
+  "requestId": "req_123456789"
+}
+```
+
+### 5.5 获取积分到期提醒
+
+**接口地址：** `GET /api/v1/user/points/expiring`
+
+**接口描述：** 获取即将过期的积分信息
+
+**请求参数：**
+
+| 参数名 | 类型 | 必填 | 说明 |
+|--------|------|------|------|
+| days | integer | 否 | 查询天数，默认30天 |
+
+**响应示例：**
+
+```json
+{
+  "code": 200,
+  "message": "获取成功",
+  "data": {
+    "totalExpiringPoints": 500,
+    "expiringGroups": [
+      {
+        "expireDate": "2024-01-15",
+        "points": 200,
+        "daysLeft": 7,
+        "sourceType": "order",
+        "description": "订单消费积分即将过期"
+      },
+      {
+        "expireDate": "2024-01-20",
+        "points": 300,
+        "daysLeft": 12,
+        "sourceType": "signin",
+        "description": "签到积分即将过期"
+      }
+    ],
+    "hasExpiring": true,
+    "urgentExpiring": 200
+  },
   "timestamp": 1640995200000,
   "requestId": "req_123456789"
 }
@@ -1137,6 +1764,113 @@ Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
 }
 ```
 
+## 九、安全策略和验证规则
+
+### 9.1 密码安全策略
+
+**密码复杂度要求：**
+- 长度：6-20位字符
+- 组成：至少包含字母和数字
+- 推荐：包含大小写字母、数字和特殊字符
+- 禁止：连续相同字符（如：111111）
+- 禁止：常见弱密码（如：123456、password）
+
+**密码安全措施：**
+- 密码采用BCrypt加密存储，不可逆
+- 支持密码强度检测和提示
+- 密码错误5次后账号锁定30分钟
+- 强制定期更换密码（可选）
+
+### 9.2 登录安全策略
+
+**登录限制：**
+- 同一IP地址5分钟内最多尝试登录10次
+- 登录失败5次后需要输入图形验证码
+- 登录失败10次后IP地址锁定1小时
+- 异地登录需要短信验证（可选）
+
+**会话管理：**
+- Token有效期：2小时
+- RefreshToken有效期：7天
+- 支持单点登录控制
+- 异常登录自动下线
+
+### 9.3 验证码安全策略
+
+**图形验证码：**
+- 有效期：5分钟
+- 复杂度：4位数字+字母组合
+- 防机器识别：添加干扰线和噪点
+- 使用后立即失效
+
+**短信验证码：**
+- 有效期：5分钟
+- 发送频率：同一手机号1分钟内只能发送1次
+- 日发送限制：同一手机号每日最多10次
+- 内容加密：验证码采用AES加密存储
+
+### 9.4 数据安全策略
+
+**敏感信息保护：**
+- 身份证号：存储时加密，显示时脱敏（如：110101****1234）
+- 手机号：显示时脱敏（如：138****8000）
+- 真实姓名：显示时脱敏（如：张**）
+- 银行卡号：显示时脱敏（如：**** **** **** 1234）
+
+**数据传输安全：**
+- 全站HTTPS加密传输
+- 敏感接口增加签名验证
+- 请求参数校验和过滤
+- SQL注入和XSS攻击防护
+
+### 9.5 接口安全策略
+
+**访问控制：**
+- JWT Token认证
+- 接口权限验证
+- 请求频率限制（Rate Limiting）
+- IP白名单控制（管理接口）
+
+**参数验证：**
+- 严格的参数类型检查
+- 参数长度和格式验证
+- 特殊字符过滤
+- 业务逻辑验证
+
+**防刷机制：**
+- 同一用户1秒内最多调用同一接口5次
+- 验证码接口1分钟内最多调用3次
+- 注册接口同一IP每小时最多调用10次
+- 异常请求自动封禁
+
+### 9.6 实名认证安全策略
+
+**认证流程：**
+- 三要素验证：姓名+身份证号+人脸识别
+- 证件照片OCR识别验证
+- 活体检测防止照片欺诈
+- 公安部身份信息核验
+
+**信息保护：**
+- 认证信息加密存储
+- 访问日志记录
+- 定期安全审计
+- 符合个人信息保护法要求
+
+### 9.7 第三方登录安全策略
+
+**授权安全：**
+- OAuth 2.0标准协议
+- State参数防CSRF攻击
+- 授权码有效期5分钟
+- 绑定IP地址验证
+
+**账号安全：**
+- 第三方账号与本地账号绑定验证
+- 支持解绑和重新绑定
+- 异常登录通知
+- 定期清理无效绑定
+
 ## 十、错误码定义
 
 ### 10.1 用户认证相关错误
@@ -1153,6 +1887,11 @@ Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
 | 40008 | 邮箱已被注册 | 注册时邮箱冲突 |
 | 40009 | 验证码发送过于频繁 | 触发发送限制 |
 | 40010 | 登录失败次数过多 | 触发安全限制 |
+| 40011 | 第三方登录授权失败 | OAuth授权过程异常 |
+| 40012 | 第三方账号已绑定其他用户 | 第三方账号冲突 |
+| 40013 | 第三方账号信息获取失败 | 第三方API调用异常 |
+| 40014 | 授权码已过期或无效 | OAuth授权码验证失败 |
+| 40015 | 需要绑定手机号 | 第三方登录需要补充信息 |
 
 ### 10.2 用户信息相关错误
 
@@ -1166,6 +1905,14 @@ Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
 | 40106 | 密码强度不够 | 密码不符合安全要求 |
 | 40107 | 原密码错误 | 修改密码时原密码验证失败 |
 | 40108 | 新密码与原密码相同 | 新密码不能与原密码相同 |
+| 40109 | 实名认证信息不完整 | 必填字段缺失 |
+| 40110 | 身份证号格式错误 | 身份证号码验证失败 |
+| 40111 | 身份证号已被认证 | 一个身份证只能认证一个账户 |
+| 40112 | 实名认证审核中 | 请等待审核结果 |
+| 40113 | 实名认证已通过 | 不能重复认证 |
+| 40114 | 实名认证被拒绝 | 认证信息不符合要求 |
+| 40115 | 人脸识别失败 | 人脸验证不通过 |
+| 40116 | 证件照片不清晰 | 请重新上传清晰照片 |
 
 ### 10.3 地址管理相关错误
 
@@ -1198,6 +1945,21 @@ Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
 | 50003 | 缓存服务异常 | Redis服务异常 |
 | 50004 | 第三方服务调用失败 | 外部API调用异常 |
 | 50005 | 文件上传失败 | 文件服务异常 |
+| 50006 | 请求频率过快 | 触发限流机制 |
+| 50007 | IP地址被封禁 | 异常行为检测 |
+| 50008 | 签名验证失败 | 请求签名错误 |
+| 50009 | 接口权限不足 | 无访问权限 |
+| 50010 | 安全验证失败 | 安全检查不通过 |
+
+### 10.6 第三方服务相关错误
+
+| 错误码 | 错误信息 | 说明 |
+|--------|----------|------|
+| 40401 | 第三方账号绑定失败 | 绑定过程异常 |
+| 40402 | 第三方账号解绑失败 | 解绑条件不满足 |
+| 40403 | 无法解绑，至少需要保留一种登录方式 | 安全限制 |
+| 40404 | 第三方服务暂不可用 | 第三方平台异常 |
+| 40405 | 第三方账号不存在 | 绑定记录无效 |
 
 ## 十一、接口调用示例
 
