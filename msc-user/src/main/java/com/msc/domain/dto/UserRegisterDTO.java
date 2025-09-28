@@ -9,6 +9,9 @@ import lombok.NoArgsConstructor;
 
 import jakarta.validation.constraints.*;
 
+import com.msc.domain.enums.GenderEnum;
+import com.msc.domain.enums.RegisterSourceEnum;
+
 /**
  * 用户注册DTO
  */
@@ -102,75 +105,5 @@ public class UserRegisterDTO {
         this.password = password;
         this.email = email;
         this.phone = phone;
-    }
-    
-    /**
-     * 性别枚举
-     */
-    public enum Gender {
-        UNKNOWN(0, "未知"),
-        MALE(1, "男"),
-        FEMALE(2, "女");
-        
-        private final Integer code;
-        private final String desc;
-        
-        Gender(Integer code, String desc) {
-            this.code = code;
-            this.desc = desc;
-        }
-        
-        public Integer getCode() {
-            return code;
-        }
-        
-        public String getDesc() {
-            return desc;
-        }
-        
-        public static Gender getByCode(Integer code) {
-            for (Gender gender : values()) {
-                if (gender.getCode().equals(code)) {
-                    return gender;
-                }
-            }
-            return null;
-        }
-    }
-    
-    /**
-     * 注册来源枚举
-     */
-    public enum RegisterSource {
-        WEB("web", "网页"),
-        APP("app", "手机应用"),
-        WECHAT("wechat", "微信"),
-        ALIPAY("alipay", "支付宝"),
-        QQ("qq", "QQ");
-        
-        private final String code;
-        private final String desc;
-        
-        RegisterSource(String code, String desc) {
-            this.code = code;
-            this.desc = desc;
-        }
-        
-        public String getCode() {
-            return code;
-        }
-        
-        public String getDesc() {
-            return desc;
-        }
-        
-        public static RegisterSource getByCode(String code) {
-            for (RegisterSource source : values()) {
-                if (source.getCode().equals(code)) {
-                    return source;
-                }
-            }
-            return null;
-        }
     }
 }

@@ -7,6 +7,8 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import com.msc.domain.enums.MessageTypeEnum;
+
 /**
  * 用户消息实体类
  */
@@ -106,55 +108,5 @@ public class UserMessage {
         this.deleted = 0;
         this.sendTime = LocalDateTime.now();
     }
-    
-    /**
-     * 消息类型枚举
-     */
-    public enum MessageType {
-        SYSTEM(1, "系统消息"),
-        ORDER(2, "订单消息"),
-        ACTIVITY(3, "活动消息"),
-        CUSTOMER_SERVICE(4, "客服消息");
-        
-        private final Integer code;
-        private final String desc;
-        
-        MessageType(Integer code, String desc) {
-            this.code = code;
-            this.desc = desc;
-        }
-        
-        public Integer getCode() {
-            return code;
-        }
-        
-        public String getDesc() {
-            return desc;
-        }
-        
-        public static MessageType getByCode(Integer code) {
-            for (MessageType type : values()) {
-                if (type.getCode().equals(code)) {
-                    return type;
-                }
-            }
-            return null;
-        }
-    }
-    
-    /**
-     * 标记为已读
-     */
-    public void markAsRead() {
-        this.read = 1;
-        this.readTime = LocalDateTime.now();
-    }
-    
-    /**
-     * 标记为删除
-     */
-    public void markAsDeleted() {
-        this.deleted = 1;
-        this.deleteTime = LocalDateTime.now();
-    }
 }
+

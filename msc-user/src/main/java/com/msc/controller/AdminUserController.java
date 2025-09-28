@@ -48,7 +48,7 @@ public class AdminUserController {
             @Parameter(description = "用户ID") @PathVariable Long id,
             @Valid @RequestBody UserUpdateDTO userUpdateDTO) {
         userUpdateDTO.setId(id);
-        userService.updateUser(userUpdateDTO);
+        userService.updateUserInfo(userUpdateDTO);
         return Result.success();
     }
 
@@ -61,18 +61,18 @@ public class AdminUserController {
         return Result.success();
     }
 
-    @GetMapping("/list")
-    @Operation(summary = "分页查询用户列表")
-    public Result<Page<UserVO>> getUserList(
-            @Parameter(description = "页码") @RequestParam(defaultValue = "1") Integer page,
-            @Parameter(description = "每页大小") @RequestParam(defaultValue = "10") Integer size,
-            @Parameter(description = "用户名") @RequestParam(required = false) String username,
-            @Parameter(description = "邮箱") @RequestParam(required = false) String email,
-            @Parameter(description = "手机号") @RequestParam(required = false) String phone,
-            @Parameter(description = "状态") @RequestParam(required = false) Integer status) {
-        Page<UserVO> userPage = userService.getUserList(page, size, username, email, phone, status);
-        return Result.success(userPage);
-    }
+//    @GetMapping("/list")
+//    @Operation(summary = "分页查询用户列表")
+//    public Result<Page<UserVO>> getUserList(
+//            @Parameter(description = "页码") @RequestParam(defaultValue = "1") Integer page,
+//            @Parameter(description = "每页大小") @RequestParam(defaultValue = "10") Integer size,
+//            @Parameter(description = "用户名") @RequestParam(required = false) String username,
+//            @Parameter(description = "邮箱") @RequestParam(required = false) String email,
+//            @Parameter(description = "手机号") @RequestParam(required = false) String phone,
+//            @Parameter(description = "状态") @RequestParam(required = false) Integer status) {
+//        Page<UserVO> userPage = userService.getUserList(page, size, username, email, phone, status);
+//        return Result.success(userPage);
+//    }
 
     @PutMapping("/batch/status")
     @Operation(summary = "批量更新用户状态")
@@ -92,9 +92,9 @@ public class AdminUserController {
 
     @DeleteMapping("/{id}")
     @Operation(summary = "删除用户账户")
-    public Result<Void> deleteUser(
-            @Parameter(description = "用户ID") @PathVariable Long id) {
-        userService.deleteUser(id);
+    public Result<Void> deleteAccount(
+            @Parameter(description = "用户ID") @PathVariable Long id,@Parameter(description = "密码") @PathVariable String password) {
+        userService.deleteAccount(id, password);
         return Result.success();
     }
 }

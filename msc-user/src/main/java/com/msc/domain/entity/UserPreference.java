@@ -7,6 +7,9 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import com.msc.domain.enums.ThemeEnum;
+import com.msc.domain.enums.PrivacyLevelEnum;
+
 /**
  * 用户偏好设置实体类
  */
@@ -131,92 +134,5 @@ public class UserPreference {
         this.privacyLevel = "public";
         this.showOnlineStatus = 1;
         this.allowSearch = 1;
-    }
-    
-    /**
-     * 主题枚举
-     */
-    public enum Theme {
-        LIGHT("light", "浅色主题"),
-        DARK("dark", "深色主题"),
-        AUTO("auto", "自动主题");
-        
-        private final String code;
-        private final String desc;
-        
-        Theme(String code, String desc) {
-            this.code = code;
-            this.desc = desc;
-        }
-        
-        public String getCode() {
-            return code;
-        }
-        
-        public String getDesc() {
-            return desc;
-        }
-        
-        public static Theme getByCode(String code) {
-            for (Theme theme : values()) {
-                if (theme.getCode().equals(code)) {
-                    return theme;
-                }
-            }
-            return null;
-        }
-    }
-    
-    /**
-     * 隐私级别枚举
-     */
-    public enum PrivacyLevel {
-        PUBLIC("public", "公开"),
-        FRIENDS("friends", "好友可见"),
-        PRIVATE("private", "私密");
-        
-        private final String code;
-        private final String desc;
-        
-        PrivacyLevel(String code, String desc) {
-            this.code = code;
-            this.desc = desc;
-        }
-        
-        public String getCode() {
-            return code;
-        }
-        
-        public String getDesc() {
-            return desc;
-        }
-        
-        public static PrivacyLevel getByCode(String code) {
-            for (PrivacyLevel level : values()) {
-                if (level.getCode().equals(code)) {
-                    return level;
-                }
-            }
-            return null;
-        }
-    }
-    
-    /**
-     * 更新通知设置
-     */
-    public void updateNotificationSettings(Integer email, Integer sms, Integer push, Integer marketing) {
-        this.emailNotification = email;
-        this.smsNotification = sms;
-        this.pushNotification = push;
-        this.marketingNotification = marketing;
-    }
-    
-    /**
-     * 更新隐私设置
-     */
-    public void updatePrivacySettings(String privacyLevel, Integer showOnlineStatus, Integer allowSearch) {
-        this.privacyLevel = privacyLevel;
-        this.showOnlineStatus = showOnlineStatus;
-        this.allowSearch = allowSearch;
     }
 }

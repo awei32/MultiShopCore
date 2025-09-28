@@ -39,7 +39,7 @@ public interface UserService {
      * @param updateDTO 更新信息DTO
      * @return 是否更新成功
      */
-    Boolean updateUserInfo(Long userId, UserUpdateDTO updateDTO);
+    Boolean updateUserInfo(UserUpdateDTO updateDTO);
 
     /**
      * 更新用户头像

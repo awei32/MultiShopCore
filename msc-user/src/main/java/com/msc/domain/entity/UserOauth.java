@@ -9,6 +9,8 @@ import lombok.EqualsAndHashCode;
 
 import java.time.LocalDateTime;
 
+import com.msc.domain.enums.OauthTypeEnum;
+
 /**
  * 用户第三方授权实体类
  */
@@ -106,48 +108,5 @@ public class UserOauth {
         this.oauthType = oauthType;
         this.oauthId = oauthId;
         this.bindTime = LocalDateTime.now();
-    }
-    
-    /**
-     * 第三方类型常量
-     */
-    public static final class OauthType {
-        /** 微信 */
-        public static final String WECHAT = "wechat";
-        /** 支付宝 */
-        public static final String ALIPAY = "alipay";
-        /** QQ */
-        public static final String QQ = "qq";
-        /** 微博 */
-        public static final String WEIBO = "weibo";
-    }
-    
-    /**
-     * 更新令牌信息
-     */
-    public void updateToken(String accessToken, String refreshToken, Integer expiresIn) {
-        this.accessToken = accessToken;
-        this.refreshToken = refreshToken;
-        this.expiresIn = expiresIn;
-        this.updateTime = LocalDateTime.now();
-    }
-    
-    /**
-     * 检查令牌是否过期
-     */
-    public boolean isTokenExpired() {
-        if (expiresIn == null || bindTime == null) {
-            return false;
-        }
-        LocalDateTime expireTime = bindTime.plusSeconds(expiresIn);
-        return LocalDateTime.now().isAfter(expireTime);
-    }
-    
-    /**
-     * 更新额外信息
-     */
-    public void updateExtraInfo(String extraInfo) {
-        this.extraInfo = extraInfo;
-        this.updateTime = LocalDateTime.now();
     }
 }

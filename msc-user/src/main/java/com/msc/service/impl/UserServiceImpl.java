@@ -69,8 +69,8 @@ public class UserServiceImpl implements UserService {
 
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public Boolean updateUserInfo(Long userId, UserUpdateDTO updateDTO) {
-        User user = userMapper.selectById(userId);
+    public Boolean updateUserInfo(UserUpdateDTO updateDTO) {
+        User user = userMapper.selectById(updateDTO.getId());
         if (user == null) {
             throw new RuntimeException("用户不存在");
         }
@@ -94,7 +94,7 @@ public class UserServiceImpl implements UserService {
 
         // 更新详细资料
         if (hasProfileInfo(updateDTO)) {
-            updateUserProfileInfo(userId, updateDTO);
+            updateUserProfileInfo(updateDTO);
         }
 
         log.info("User info updated successfully: {}", userId);
@@ -558,11 +558,11 @@ public class UserServiceImpl implements UserService {
     /**
      * 更新用户详细资料信息
      */
-    private void updateUserProfileInfo(Long userId, UserUpdateDTO updateDTO) {
-        UserProfile profile = getUserProfile(userId);
+    private void updateUserProfileInfo(UserUpdateDTO updateDTO) {
+        UserProfile profile = getUserProfile(updateDTO.getId());
         if (profile == null) {
             profile = new UserProfile();
-            profile.setUserId(userId);
+            profile.setUserId(updateDTO.getId());
         }
 
         if (StringUtils.hasText(updateDTO.getBio())) {
