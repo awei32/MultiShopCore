@@ -12,16 +12,13 @@ import org.springframework.web.bind.annotation.*;
 
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
-import jakarta.validation.constraints.Email;
-import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.Pattern;
 
 /**
  * 用户认证控制器
  */
 @Slf4j
 @RestController
-@RequestMapping("/api/auth")
+@RequestMapping("/api/v1/auth")
 @RequiredArgsConstructor
 @Validated
 public class UserAuthController {
@@ -47,7 +44,7 @@ public class UserAuthController {
             token = token.substring(7);
             userAuthService.logout(userId, token);
         }
-        return Result.success("退出成功");
+        return Result.success("退出成功", true);
     }
 
     @PostMapping("/refresh")
@@ -56,31 +53,15 @@ public class UserAuthController {
         return Result.success("Token刷新成功", newAccessToken);
     }
 
-    @GetMapping("/validate")
-    public Result<UserVO> validateToken(HttpServletRequest request) {
-        String token = request.getHeader("Authorization");
-        if (token != null && token.startsWith("Bearer ")) {
-            token = token.substring(7);
-            UserVO userVO = userAuthService.validateToken(token);
-            return Result.success("Token有效", userVO);
-        }
-        return Result.error("Token无效");
-    }
+    // 删除 validateToken 接口，API文档中没有定义
 
-    @PostMapping("/send-sms-code")
-    public Result<Boolean> sendSmsCode(
-            @RequestParam @Pattern(regexp = "^1[3-9]\\d{9}$", message = "手机号格式不正确") String phone,
-            @RequestParam String type) {
-        userAuthService.sendSmsVerifyCode(phone, type);
-        return Result.success("验证码发送成功");
-    }
-
-    @PostMapping("/send-email-code")
-    public Result<Boolean> sendEmailCode(
-            @RequestParam @Email(message = "邮箱格式不正确") String email,
-            @RequestParam String type) {
-        userAuthService.sendEmailVerifyCode(email, type);
-        return Result.success("验证码发送成功");
+    @PostMapping("/captcha/send")
+    public Result<Boolean> sendVerifyCode(
+            @RequestParam String target,
+            @RequestParam String type,
+            @RequestParam String scene) {
+        boolean result = userAuthService.sendVerifyCode(target, scene);
+        return Result.success("验证码发送成功", result);
     }
 
     @PostMapping("/verify-code")
@@ -98,7 +79,7 @@ public class UserAuthController {
             @RequestParam String newPassword,
             @RequestParam String code) {
         userAuthService.resetPassword(account, newPassword, code);
-        return Result.success("密码重置成功");
+        return Result.success("密码重置成功", true);
     }
 
     @PostMapping("/change-password")
@@ -107,24 +88,18 @@ public class UserAuthController {
             @RequestParam String oldPassword,
             @RequestParam String newPassword) {
         userAuthService.changePassword(userId, oldPassword, newPassword);
-        return Result.success("密码修改成功");
+        return Result.success("密码修改成功", true);
     }
 
-    @GetMapping("/check-username")
-    public Result<Boolean> checkUsernameAvailable(@RequestParam String username) {
-        boolean available = userAuthService.isUsernameAvailable(username);
-        return Result.success("检查完成", available);
-    }
-
-    @GetMapping("/check-email")
-    public Result<Boolean> checkEmailAvailable(@RequestParam String email) {
-        boolean available = userAuthService.isEmailAvailable(email);
-        return Result.success("检查完成", available);
-    }
-
-    @GetMapping("/check-phone")
-    public Result<Boolean> checkPhoneAvailable(@RequestParam String phone) {
-        boolean available = userAuthService.isPhoneAvailable(phone);
-        return Result.success("检查完成", available);
+    // 添加获取用户信息接口
+    @GetMapping("/profile")
+    public Result<UserVO> getUserProfile(HttpServletRequest request) {
+        String token = request.getHeader("Authorization");
+        if (token != null && token.startsWith("Bearer ")) {
+            token = token.substring(7);
+            UserVO userVO = userAuthService.validateToken(token);
+            return Result.success("获取成功", userVO);
+        }
+        return Result.error("Token无效");
     }
 }
