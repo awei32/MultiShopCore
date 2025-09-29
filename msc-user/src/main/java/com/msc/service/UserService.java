@@ -9,6 +9,9 @@ import com.msc.domain.vo.UserVO;
 
 import java.util.List;
 
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
+
 /**
  * 用户信息管理服务接口
  * 
@@ -34,8 +37,7 @@ public interface UserService {
 
     /**
      * 更新用户基本信息
-     * 
-     * @param userId 用户ID
+     *
      * @param updateDTO 更新信息DTO
      * @return 是否更新成功
      */
@@ -44,11 +46,14 @@ public interface UserService {
     /**
      * 更新用户头像
      * 
-     * @param userId 用户ID
+     * @param userId    用户ID
      * @param avatarUrl 头像URL
      * @return 是否更新成功
      */
-    Boolean updateAvatar(Long userId, String avatarUrl);
+    Boolean updateAvatar(Long userId, MultipartFile avatarUrl);
+
+//    @Transactional(rollbackFor = Exception.class)
+//    Boolean updateAvatar(Long userId, String avatarUrl);
 
     /**
      * 更新用户状态
@@ -70,7 +75,7 @@ public interface UserService {
     /**
      * 更新用户详细资料
      * 
-     * @param userId 用户ID
+     * @param userId  用户ID
      * @param profile 用户详细资料
      * @return 是否更新成功
      */
@@ -87,7 +92,7 @@ public interface UserService {
     /**
      * 添加收货地址
      * 
-     * @param userId 用户ID
+     * @param userId  用户ID
      * @param address 收货地址
      * @return 是否添加成功
      */
@@ -96,7 +101,7 @@ public interface UserService {
     /**
      * 更新收货地址
      * 
-     * @param userId 用户ID
+     * @param userId  用户ID
      * @param address 收货地址
      * @return 是否更新成功
      */
@@ -105,7 +110,7 @@ public interface UserService {
     /**
      * 删除收货地址
      * 
-     * @param userId 用户ID
+     * @param userId    用户ID
      * @param addressId 地址ID
      * @return 是否删除成功
      */
@@ -113,8 +118,8 @@ public interface UserService {
 
     /**
      * 设置默认收货地址
-     * 
-     * @param userId 用户ID
+     *
+     * @param userId    用户ID
      * @param addressId 地址ID
      * @return 是否设置成功
      */
@@ -122,7 +127,7 @@ public interface UserService {
 
     /**
      * 获取默认收货地址
-     * 
+     *
      * @param userId 用户ID
      * @return 默认收货地址
      */
@@ -131,21 +136,21 @@ public interface UserService {
     /**
      * 分页查询用户列表
      * 
-     * @param page 页码
-     * @param size 每页大小
-     * @param keyword 搜索关键词
-     * @param status 用户状态
+     * @param page        页码
+     * @param size        每页大小
+     * @param keyword     搜索关键词
+     * @param status      用户状态
      * @param memberLevel 会员等级
      * @return 用户分页列表
      */
-    Page<UserVO> getUserList(Integer page, Integer size, String keyword, 
-                            Integer status, String memberLevel);
+    Page<UserVO> getUserList(Integer page, Integer size, String keyword,
+            Integer status, String memberLevel);
 
     /**
      * 批量更新用户状态
      * 
      * @param userIds 用户ID列表
-     * @param status 状态
+     * @param status  状态
      * @return 是否更新成功
      */
     Boolean batchUpdateUserStatus(List<Long> userIds, Integer status);
@@ -160,9 +165,9 @@ public interface UserService {
     /**
      * 实名认证
      * 
-     * @param userId 用户ID
+     * @param userId   用户ID
      * @param realName 真实姓名
-     * @param idCard 身份证号
+     * @param idCard   身份证号
      * @return 是否认证成功
      */
     Boolean realNameVerification(Long userId, String realName, String idCard);
@@ -170,8 +175,8 @@ public interface UserService {
     /**
      * 绑定手机号
      * 
-     * @param userId 用户ID
-     * @param phone 手机号
+     * @param userId     用户ID
+     * @param phone      手机号
      * @param verifyCode 验证码
      * @return 是否绑定成功
      */
@@ -180,8 +185,8 @@ public interface UserService {
     /**
      * 绑定邮箱
      * 
-     * @param userId 用户ID
-     * @param email 邮箱
+     * @param userId     用户ID
+     * @param email      邮箱
      * @param verifyCode 验证码
      * @return 是否绑定成功
      */
@@ -190,9 +195,19 @@ public interface UserService {
     /**
      * 注销用户账号
      * 
-     * @param userId 用户ID
+     * @param userId   用户ID
      * @param password 密码
      * @return 是否注销成功
      */
     Boolean deleteAccount(Long userId, String password);
+
+    /**
+     * 实名认证
+     * 
+     * @param userId   用户ID
+     * @param realName 真实姓名
+     * @param idCard   身份证号
+     * @return 是否认证成功
+     */
+    Boolean verifyUser(Long userId, String realName, String idCard);
 }

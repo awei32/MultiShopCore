@@ -47,19 +47,19 @@ public class UserProfileController {
         // 从token中解析用户ID，这里简化处理
         Long userId = 1L; // 实际应该从token中解析
         userUpdateDTO.setId(userId);
-        userService.updateUser(userUpdateDTO);
+        userService.updateUserInfo(userUpdateDTO);
         return Result.success();
     }
 
     @PostMapping("/avatar")
     @Operation(summary = "更新用户头像")
-    public Result<String> updateAvatar(
+    public Result<Boolean> updateAvatar(
             @RequestHeader("Authorization") String authorization,
             @Parameter(description = "头像文件") @RequestParam("file") MultipartFile file) {
         // 从token中解析用户ID，这里简化处理
         Long userId = 1L; // 实际应该从token中解析
-        String avatarUrl = userService.updateAvatar(userId, file);
-        return Result.success(avatarUrl);
+        Boolean isSuccess = userService.updateAvatar(userId, file);
+        return Result.success(isSuccess);
     }
 
     @PutMapping("/password")
@@ -98,7 +98,7 @@ public class UserProfileController {
         // 从token中解析用户ID，这里简化处理
         Long userId = 1L; // 实际应该从token中解析
         address.setUserId(userId);
-        userService.addUserAddress(address);
+        userService.addUserAddress(userId, address);
         return Result.success();
     }
 
@@ -112,7 +112,7 @@ public class UserProfileController {
         Long userId = 1L; // 实际应该从token中解析
         address.setId(addressId);
         address.setUserId(userId);
-        userService.updateUserAddress(address);
+        userService.updateUserAddress(userId, address);
         return Result.success();
     }
 
@@ -178,7 +178,7 @@ public class UserProfileController {
             @RequestHeader("Authorization") String authorization,
             @Parameter(description = "真实姓名") @RequestParam String realName,
             @Parameter(description = "身份证号") @RequestParam String idCard) {
-        // 从token中解析用户ID，这里简化处理
+        // TODO:从token中解析用户ID，这里简化处理
         Long userId = 1L; // 实际应该从token中解析
         userService.verifyUser(userId, realName, idCard);
         return Result.success();

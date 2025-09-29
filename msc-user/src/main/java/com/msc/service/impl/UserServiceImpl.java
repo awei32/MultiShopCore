@@ -20,6 +20,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.time.LocalDateTime;
 import java.util.HashMap;
@@ -59,7 +60,8 @@ public class UserServiceImpl implements UserService {
     @Override
     public UserVO getUserByUsername(String username) {
         LambdaQueryWrapper<User> wrapper = new LambdaQueryWrapper<>();
-        wrapper.eq(User::getUsername, username);
+        wrapper.eq(User::getUsername, username)
+                .eq(User::getIsDeleted, 0);
         User user = userMapper.selectOne(wrapper);
         if (user == null) {
             return null;
@@ -97,26 +99,32 @@ public class UserServiceImpl implements UserService {
             updateUserProfileInfo(updateDTO);
         }
 
-        log.info("User info updated successfully: {}", userId);
+        log.info("User info updated successfully: {}", updateDTO.getId());
         return result > 0;
     }
 
-    @Override
     @Transactional(rollbackFor = Exception.class)
-    public Boolean updateAvatar(Long userId, String avatarUrl) {
-        if (!StringUtils.hasText(avatarUrl)) {
-            throw new RuntimeException("头像URL不能为空");
-        }
-
-        LambdaUpdateWrapper<User> wrapper = new LambdaUpdateWrapper<>();
-        wrapper.eq(User::getId, userId)
-               .set(User::getAvatar, avatarUrl)
-               .set(User::getUpdateTime, LocalDateTime.now());
-
-        int result = userMapper.update(null, wrapper);
-        log.info("User avatar updated successfully: {}", userId);
-        return result > 0;
+    @Override
+    public Boolean updateAvatar(Long userId, MultipartFile avatarUrl) {
+        return null;
     }
+
+    // @Transactional(rollbackFor = Exception.class)
+    // @Override
+    // public Boolean updateAvatar(Long userId, String avatarUrl) {
+    // if (!StringUtils.hasText(avatarUrl)) {
+    // throw new RuntimeException("头像URL不能为空");
+    // }
+    //
+    // LambdaUpdateWrapper<User> wrapper = new LambdaUpdateWrapper<>();
+    // wrapper.eq(User::getId, userId)
+    // .set(User::getAvatar, avatarUrl)
+    // .set(User::getUpdateTime, LocalDateTime.now());
+    //
+    // int result = userMapper.update(null, wrapper);
+    // log.info("User avatar updated successfully: {}", userId);
+    // return result > 0;
+    // }
 
     @Override
     @Transactional(rollbackFor = Exception.class)
@@ -127,8 +135,8 @@ public class UserServiceImpl implements UserService {
 
         LambdaUpdateWrapper<User> wrapper = new LambdaUpdateWrapper<>();
         wrapper.eq(User::getId, userId)
-               .set(User::getStatus, status)
-               .set(User::getUpdateTime, LocalDateTime.now());
+                .set(User::getStatus, status)
+                .set(User::getUpdateTime, LocalDateTime.now());
 
         int result = userMapper.update(null, wrapper);
         log.info("User status updated successfully: {} -> {}", userId, status);
@@ -168,9 +176,9 @@ public class UserServiceImpl implements UserService {
     public List<UserAddress> getUserAddresses(Long userId) {
         LambdaQueryWrapper<UserAddress> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(UserAddress::getUserId, userId)
-               .eq(UserAddress::getDeleted, 0)
-               .orderByDesc(UserAddress::getDefaultAddress)
-               .orderByDesc(UserAddress::getCreateTime);
+                .eq(UserAddress::getIsDeleted, 0)
+                .orderByDesc(UserAddress::getIsDefault)
+                .orderByDesc(UserAddress::getCreateTime);
         return userAddressMapper.selectList(wrapper);
     }
 
@@ -184,21 +192,8 @@ public class UserServiceImpl implements UserService {
         }
 
         address.setUserId(userId);
-        address.setDeleted(0);
         address.setCreateTime(LocalDateTime.now());
         address.setUpdateTime(LocalDateTime.now());
-
-        // 如果是第一个地址或设置为默认地址，则设为默认
-        if (count == 0 || Integer.valueOf(1).equals(address.getDefaultAddress())) {
-            // 取消其他默认地址
-            LambdaUpdateWrapper<UserAddress> defaultWrapper = new LambdaUpdateWrapper<>();
-            defaultWrapper.eq(UserAddress::getUserId, userId)
-                         .set(UserAddress::getDefaultAddress, 0);
-            userAddressMapper.update(null, defaultWrapper);
-            address.setDefaultAddress(1);
-        } else {
-            address.setDefaultAddress(0);
-        }
 
         int result = userAddressMapper.insert(address);
         log.info("User address added successfully: {}", userId);
@@ -217,14 +212,6 @@ public class UserServiceImpl implements UserService {
         address.setUserId(userId);
         address.setUpdateTime(LocalDateTime.now());
 
-        // 如果设置为默认地址，取消其他默认地址
-        if (Integer.valueOf(1).equals(address.getDefaultAddress())) {
-            LambdaUpdateWrapper<UserAddress> defaultWrapper = new LambdaUpdateWrapper<>();
-            defaultWrapper.eq(UserAddress::getUserId, userId)
-                         .set(UserAddress::getDefaultAddress, 0);
-            userAddressMapper.update(null, defaultWrapper);
-        }
-
         int result = userAddressMapper.updateById(address);
         log.info("User address updated successfully: {}", userId);
         return result > 0;
@@ -239,13 +226,7 @@ public class UserServiceImpl implements UserService {
             throw new RuntimeException("地址不存在或无权限删除");
         }
 
-        // 软删除
-        LambdaUpdateWrapper<UserAddress> wrapper = new LambdaUpdateWrapper<>();
-        wrapper.eq(UserAddress::getId, addressId)
-               .set(UserAddress::getDeleted, 1)
-               .set(UserAddress::getUpdateTime, LocalDateTime.now());
-
-        int result = userAddressMapper.update(null, wrapper);
+        int result = userAddressMapper.deleteById(addressId);
         log.info("User address deleted successfully: {}", addressId);
         return result > 0;
     }
@@ -255,20 +236,20 @@ public class UserServiceImpl implements UserService {
     public Boolean setDefaultAddress(Long userId, Long addressId) {
         // 验证地址是否属于该用户
         UserAddress address = userAddressMapper.selectById(addressId);
-        if (address == null || !userId.equals(address.getUserId()) || Integer.valueOf(1).equals(address.getDeleted())) {
+        if (address == null || !userId.equals(address.getUserId())) {
             throw new RuntimeException("地址不存在或无权限设置");
         }
 
         // 取消所有默认地址
         LambdaUpdateWrapper<UserAddress> defaultWrapper = new LambdaUpdateWrapper<>();
         defaultWrapper.eq(UserAddress::getUserId, userId)
-                     .set(UserAddress::getDefaultAddress, 0);
+                .set(UserAddress::getIsDefault, 0);
         userAddressMapper.update(null, defaultWrapper);
 
         // 设置新的默认地址
         LambdaUpdateWrapper<UserAddress> setDefaultWrapper = new LambdaUpdateWrapper<>();
         setDefaultWrapper.eq(UserAddress::getId, addressId)
-                        .set(UserAddress::getDefaultAddress, 1);
+                .set(UserAddress::getIsDefault, 1);
         userAddressMapper.update(null, setDefaultWrapper);
 
         log.info("Default address set successfully: {} -> {}", userId, addressId);
@@ -281,41 +262,41 @@ public class UserServiceImpl implements UserService {
     }
 
     @Override
-    public Page<UserVO> getUserList(Integer page, Integer size, String keyword, 
-                                   Integer status, String memberLevel) {
+    public Page<UserVO> getUserList(Integer page, Integer size, String keyword,
+            Integer status, String memberLevel) {
         Page<User> userPage = new Page<>(page, size);
-        
+
         LambdaQueryWrapper<User> wrapper = new LambdaQueryWrapper<>();
-        
+
         // 关键词搜索
         if (StringUtils.hasText(keyword)) {
             wrapper.and(w -> w.like(User::getUsername, keyword)
-                           .or().like(User::getNickname, keyword)
-                           .or().like(User::getEmail, keyword)
-                           .or().like(User::getPhone, keyword));
+                    .or().like(User::getNickname, keyword)
+                    .or().like(User::getEmail, keyword)
+                    .or().like(User::getPhone, keyword));
         }
-        
+
         // 状态筛选
         if (status != null) {
             wrapper.eq(User::getStatus, status);
         }
-        
+
         // 会员等级筛选
         if (StringUtils.hasText(memberLevel)) {
             wrapper.eq(User::getMemberLevel, memberLevel);
         }
-        
+
         wrapper.orderByDesc(User::getCreateTime);
-        
+
         Page<User> result = userMapper.selectPage(userPage, wrapper);
-        
+
         // 转换为VO
         Page<UserVO> voPage = new Page<>();
         BeanUtils.copyProperties(result, voPage);
         voPage.setRecords(result.getRecords().stream()
-                               .map(this::convertToUserVO)
-                               .toList());
-        
+                .map(this::convertToUserVO)
+                .toList());
+
         return voPage;
     }
 
@@ -325,15 +306,15 @@ public class UserServiceImpl implements UserService {
         if (userIds == null || userIds.isEmpty()) {
             throw new RuntimeException("用户ID列表不能为空");
         }
-        
+
         if (status == null || (status < 0 || status > 2)) {
             throw new RuntimeException("状态值不正确");
         }
 
         LambdaUpdateWrapper<User> wrapper = new LambdaUpdateWrapper<>();
         wrapper.in(User::getId, userIds)
-               .set(User::getStatus, status)
-               .set(User::getUpdateTime, LocalDateTime.now());
+                .set(User::getStatus, status)
+                .set(User::getUpdateTime, LocalDateTime.now());
 
         int result = userMapper.update(null, wrapper);
         log.info("Batch update user status successfully: {} users -> {}", userIds.size(), status);
@@ -343,26 +324,26 @@ public class UserServiceImpl implements UserService {
     @Override
     public Map<String, Object> getUserStatistics() {
         Map<String, Object> statistics = new HashMap<>();
-        
+
         // 用户总数统计
         LambdaQueryWrapper<User> totalWrapper = new LambdaQueryWrapper<>();
         statistics.put("totalUsers", userMapper.selectCount(totalWrapper));
-        
+
         // 正常用户统计
         LambdaQueryWrapper<User> normalWrapper = new LambdaQueryWrapper<>();
         normalWrapper.eq(User::getStatus, 1);
         statistics.put("normalUsers", userMapper.selectCount(normalWrapper));
-        
+
         // 禁用用户统计
         LambdaQueryWrapper<User> disabledWrapper = new LambdaQueryWrapper<>();
         disabledWrapper.eq(User::getStatus, 0);
         statistics.put("disabledUsers", userMapper.selectCount(disabledWrapper));
-        
+
         // 锁定用户统计
         LambdaQueryWrapper<User> lockedWrapper = new LambdaQueryWrapper<>();
         lockedWrapper.eq(User::getStatus, 2);
         statistics.put("lockedUsers", userMapper.selectCount(lockedWrapper));
-        
+
         return statistics;
     }
 
@@ -381,7 +362,7 @@ public class UserServiceImpl implements UserService {
         // 检查身份证号是否已被使用
         LambdaQueryWrapper<UserProfile> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(UserProfile::getIdCard, idCard)
-               .ne(UserProfile::getUserId, userId);
+                .ne(UserProfile::getUserId, userId);
         if (userProfileMapper.selectCount(wrapper) > 0) {
             throw new RuntimeException("该身份证号已被其他用户使用");
         }
@@ -392,17 +373,17 @@ public class UserServiceImpl implements UserService {
             profile = new UserProfile();
             profile.setUserId(userId);
         }
-        
- // 更新用户资料
+
+        // 更新用户资料
         profile.setRealName(realName);
         profile.setIdCard(idCard);
         profile.setUpdateTime(LocalDateTime.now());
-        
+
         // 更新用户认证状态
         LambdaUpdateWrapper<User> userWrapper = new LambdaUpdateWrapper<>();
         userWrapper.eq(User::getId, userId)
-                   .set(User::getIsVerified, 1)
-                   .set(User::getUpdateTime, LocalDateTime.now());
+                .set(User::getIsVerified, 1)
+                .set(User::getUpdateTime, LocalDateTime.now());
         userMapper.update(null, userWrapper);
 
         // 保存或更新用户详细资料
@@ -427,7 +408,7 @@ public class UserServiceImpl implements UserService {
         // 检查手机号是否已被使用
         LambdaQueryWrapper<User> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(User::getPhone, phone)
-               .ne(User::getId, userId);
+                .ne(User::getId, userId);
         if (userMapper.selectCount(wrapper) > 0) {
             throw new RuntimeException("该手机号已被其他用户使用");
         }
@@ -435,8 +416,8 @@ public class UserServiceImpl implements UserService {
         // 更新用户手机号
         LambdaUpdateWrapper<User> updateWrapper = new LambdaUpdateWrapper<>();
         updateWrapper.eq(User::getId, userId)
-                     .set(User::getPhone, phone)
-                     .set(User::getUpdateTime, LocalDateTime.now());
+                .set(User::getPhone, phone)
+                .set(User::getUpdateTime, LocalDateTime.now());
 
         int result = userMapper.update(null, updateWrapper);
         log.info("Phone bound successfully: {} -> {}", userId, phone);
@@ -454,7 +435,7 @@ public class UserServiceImpl implements UserService {
         // 检查邮箱是否已被使用
         LambdaQueryWrapper<User> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(User::getEmail, email)
-               .ne(User::getId, userId);
+                .ne(User::getId, userId);
         if (userMapper.selectCount(wrapper) > 0) {
             throw new RuntimeException("该邮箱已被其他用户使用");
         }
@@ -462,8 +443,8 @@ public class UserServiceImpl implements UserService {
         // 更新用户邮箱
         LambdaUpdateWrapper<User> updateWrapper = new LambdaUpdateWrapper<>();
         updateWrapper.eq(User::getId, userId)
-                     .set(User::getEmail, email)
-                     .set(User::getUpdateTime, LocalDateTime.now());
+                .set(User::getEmail, email)
+                .set(User::getUpdateTime, LocalDateTime.now());
 
         int result = userMapper.update(null, updateWrapper);
         log.info("Email bound successfully: {} -> {}", userId, email);
@@ -486,12 +467,17 @@ public class UserServiceImpl implements UserService {
         // 软删除用户（将状态设为已删除）
         LambdaUpdateWrapper<User> wrapper = new LambdaUpdateWrapper<>();
         wrapper.eq(User::getId, userId)
-               .set(User::getStatus, -1) // -1表示已删除
-               .set(User::getUpdateTime, LocalDateTime.now());
+                .set(User::getStatus, -1) // -1表示已删除
+                .set(User::getUpdateTime, LocalDateTime.now());
 
         int result = userMapper.update(null, wrapper);
         log.info("User account deleted: {}", userId);
         return result > 0;
+    }
+
+    @Override
+    public Boolean verifyUser(Long userId, String realName, String idCard) {
+        return null;
     }
 
     /**
@@ -500,7 +486,7 @@ public class UserServiceImpl implements UserService {
     private UserVO convertToUserVO(User user) {
         UserVO userVO = new UserVO();
         BeanUtils.copyProperties(user, userVO);
-        
+
         // 设置性别描述
         if (user.getGender() != null) {
             switch (user.getGender()) {
@@ -509,7 +495,7 @@ public class UserServiceImpl implements UserService {
                 default -> userVO.setGenderDesc("未知");
             }
         }
-        
+
         // 设置状态描述
         if (user.getStatus() != null) {
             switch (user.getStatus()) {
@@ -519,7 +505,7 @@ public class UserServiceImpl implements UserService {
                 default -> userVO.setStatusDesc("未知");
             }
         }
-        
+
         // 设置注册来源描述
         if (StringUtils.hasText(user.getRegisterSource())) {
             switch (user.getRegisterSource()) {
@@ -531,17 +517,17 @@ public class UserServiceImpl implements UserService {
                 default -> userVO.setRegisterSourceDesc(user.getRegisterSource());
             }
         }
-        
+
         // 设置认证状态描述
         if (user.getIsVerified() != null) {
             userVO.setVerifiedDesc(Integer.valueOf(1).equals(user.getIsVerified()) ? "已认证" : "未认证");
         }
-        
+
         // 手机号脱敏
         if (StringUtils.hasText(user.getPhone())) {
             userVO.setPhone(maskPhone(user.getPhone()));
         }
-        
+
         return userVO;
     }
 
@@ -550,9 +536,9 @@ public class UserServiceImpl implements UserService {
      */
     private boolean hasProfileInfo(UserUpdateDTO updateDTO) {
         return StringUtils.hasText(updateDTO.getBio()) ||
-               StringUtils.hasText(updateDTO.getProvince()) ||
-               StringUtils.hasText(updateDTO.getCity()) ||
-               StringUtils.hasText(updateDTO.getAddress());
+                StringUtils.hasText(updateDTO.getProvince()) ||
+                StringUtils.hasText(updateDTO.getCity()) ||
+                StringUtils.hasText(updateDTO.getAddress());
     }
 
     /**
@@ -594,9 +580,10 @@ public class UserServiceImpl implements UserService {
         if (idCard == null || idCard.length() != 18) {
             return false;
         }
-        
+
         // 简单的身份证号格式验证
-        return idCard.matches("^[1-9]\\d{5}(18|19|20)\\d{2}((0[1-9])|(1[0-2]))(([0-2][1-9])|10|20|30|31)\\d{3}[0-9Xx]$");
+        return idCard
+                .matches("^[1-9]\\d{5}(18|19|20)\\d{2}((0[1-9])|(1[0-2]))(([0-2][1-9])|10|20|30|31)\\d{3}[0-9Xx]$");
     }
 
     /**
