@@ -13,11 +13,12 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 import java.util.stream.Collectors;
 
 /**
- * 全局异常处理器
+ * Web全局异常处理器
+ * 用于处理基于Servlet的Web应用异常
  */
 @Slf4j
 @RestControllerAdvice
-public class GlobalExceptionHandler {
+public class WebGlobalExceptionHandler {
 
     /**
      * 处理业务异常
@@ -54,8 +55,6 @@ public class GlobalExceptionHandler {
         log.warn("绑定异常: {}", message);
         return Result.error(400, message);
     }
-
-
 
     /**
      * 处理系统异常

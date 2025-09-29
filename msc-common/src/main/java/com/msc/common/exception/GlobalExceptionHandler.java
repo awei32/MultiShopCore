@@ -1,6 +1,8 @@
 package com.msc.common.exception;
 
 import com.alibaba.fastjson2.JSON;
+import com.msc.common.result.Result;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.web.reactive.error.ErrorWebExceptionHandler;
 import org.springframework.core.annotation.Order;
 import org.springframework.core.io.buffer.DataBuffer;
@@ -17,11 +19,12 @@ import java.util.HashMap;
 import java.util.Map;
 
 /**
- * 全局异常处理器
+ * 网关全局异常处理器
  * 统一处理网关层面的异常
  */
 @Component
 @Order(-1)
+@Slf4j
 public class GlobalExceptionHandler implements ErrorWebExceptionHandler {
 
     @Override
@@ -42,6 +45,12 @@ public class GlobalExceptionHandler implements ErrorWebExceptionHandler {
             ResponseStatusException responseStatusException = (ResponseStatusException) ex;
             status = HttpStatus.valueOf(responseStatusException.getStatusCode().value());
             message = responseStatusException.getReason();
+        } else if (ex instanceof BusinessException) {
+            // 处理业务异常
+            BusinessException businessException = (BusinessException) ex;
+            status = HttpStatus.BAD_REQUEST;
+            message = businessException.getMessage();
+            return writeErrorResponse(response, status, message, exchange.getRequest().getURI().getPath(), businessException.getCode());
         } else if (ex instanceof RuntimeException) {
             status = HttpStatus.INTERNAL_SERVER_ERROR;
             message = "Internal server error: " + ex.getMessage();
@@ -50,14 +59,22 @@ public class GlobalExceptionHandler implements ErrorWebExceptionHandler {
             message = "Unknown error occurred";
         }
 
+        return writeErrorResponse(response, status, message, exchange.getRequest().getURI().getPath(), status.value());
+    }
+    
+    /**
+     * 写入错误响应
+     * @param response 响应对象
+     * @param status HTTP状态码
+     * @param message 错误消息
+     * @param path 请求路径
+     * @param code 业务错误码
+     * @return Mono<Void>
+     */
+    private Mono<Void> writeErrorResponse(ServerHttpResponse response, HttpStatus status, String message, String path, Integer code) {
         response.setStatusCode(status);
 
-        Map<String, Object> result = new HashMap<>();
-        result.put("code", status.value());
-        result.put("message", message);
-        result.put("timestamp", System.currentTimeMillis());
-        result.put("path", exchange.getRequest().getURI().getPath());
-
+        Result<Void> result = Result.error(code, message);
         String body = JSON.toJSONString(result);
         DataBuffer buffer = response.bufferFactory().wrap(body.getBytes(StandardCharsets.UTF_8));
 
