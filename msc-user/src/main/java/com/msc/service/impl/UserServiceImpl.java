@@ -104,7 +104,8 @@ public class UserServiceImpl implements UserService {
         log.info("User info updated successfully: {}", updateDTO.getId());
         return result > 0;
     }
-
+    
+    //TODO: 头像上传
     @Transactional(rollbackFor = Exception.class)
     @Override
     public Boolean updateAvatar(Long userId, MultipartFile avatarUrl) {
@@ -477,6 +478,7 @@ public class UserServiceImpl implements UserService {
         return result > 0;
     }
 
+    // TODO: 实名认证待完善
     @Override
     public Boolean verifyUser(Long userId, String realName, String idCard) {
         return null;
