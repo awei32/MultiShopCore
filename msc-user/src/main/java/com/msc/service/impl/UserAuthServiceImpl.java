@@ -1,6 +1,7 @@
 package com.msc.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.msc.common.util.JwtUtil;
 import com.msc.domain.dto.UserLoginDTO;
 import com.msc.domain.dto.UserRegisterDTO;
 import com.msc.domain.entity.User;
@@ -14,7 +15,6 @@ import com.msc.mapper.UserPreferenceMapper;
 import com.msc.mapper.UserProfileMapper;
 import com.msc.service.UserAuthService;
 import com.msc.service.VerifyCodeService;
-import com.msc.util.JwtUtil;
 import com.msc.util.PasswordUtil;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.BeanUtils;
@@ -27,6 +27,8 @@ import org.springframework.util.StringUtils;
 import java.time.LocalDateTime;
 import java.util.concurrent.TimeUnit;
 import java.util.regex.Pattern;
+
+import static com.msc.domain.enums.LoginTypeEnum.*;
 
 /**
  * 用户认证服务实现类
@@ -70,7 +72,7 @@ public class UserAuthServiceImpl implements UserAuthService {
 
         // 验证验证码
         if (!verifyCodeService.verifyCode(getAccountFromRegisterDTO(registerDTO), 
-                                         registerDTO.getVerifyCode(), "register")) {
+                                         registerDTO.getVerifyCode(), REGISTER.getCode())) {
             throw new RuntimeException("验证码错误或已过期");
         }
 
@@ -113,14 +115,14 @@ public class UserAuthServiceImpl implements UserAuthService {
         userPreferenceMapper.insert(userPreference);
 
         // 记录登录日志
-        recordLoginLog(user.getId(), "web", "Browser", 1);
+        recordLoginLog(user.getId(), "web", "Browser", REGISTER.getCode());
 
         // 转换为VO并返回
         UserVO userVO = convertToUserVO(user);
         
         // 生成Token
-        String accessToken = jwtUtil.generateAccessToken(user.getId(), user.getUsername());
-        String refreshToken = jwtUtil.generateRefreshToken(user.getId(), user.getUsername());
+        String accessToken = jwtUtil.generateToken(user.getId(), user.getUsername());
+        String refreshToken = jwtUtil.generateToken(user.getId(), user.getUsername());
         
         // 注意：实际项目中Token应该通过响应头或其他方式返回，这里仅作演示
         log.info("Generated tokens for user: {}", user.getUsername());
@@ -160,14 +162,14 @@ public class UserAuthServiceImpl implements UserAuthService {
         userMapper.updateById(user);
 
         // 记录登录日志
-        recordLoginLog(user.getId(), "web", "Browser", 1);
+        recordLoginLog(user.getId(), "web", "Browser", PASSWORD.getCode());
 
         // 转换为VO并返回
         UserVO userVO = convertToUserVO(user);
         
         // 生成Token
-        String accessToken = jwtUtil.generateAccessToken(user.getId(), user.getUsername());
-        String refreshToken = jwtUtil.generateRefreshToken(user.getId(), user.getUsername());
+        String accessToken = jwtUtil.generateToken(user.getId(), user.getUsername());
+        String refreshToken = jwtUtil.generateToken(user.getId(), user.getUsername());
         
         // 注意：实际项目中Token应该通过响应头或其他方式返回，这里仅作演示
         log.info("Generated tokens for user: {}", user.getUsername());
@@ -180,10 +182,12 @@ public class UserAuthServiceImpl implements UserAuthService {
     public Boolean logout(Long userId, String token) {
         try {
             // 将Token加入黑名单
-            Long remainingTime = jwtUtil.getTokenRemainingTime(token);
-            if (remainingTime > 0) {
-                String key = TOKEN_BLACKLIST_PREFIX + token;
-                redisTemplate.opsForValue().set(key, "1", remainingTime, TimeUnit.SECONDS);
+            if (!jwtUtil.isTokenExpired(token)) {
+                Long remainingTime = jwtUtil.getExpirationDateFromToken(token).getTime() - System.currentTimeMillis();
+                if (remainingTime > 0) {
+                    String key = TOKEN_BLACKLIST_PREFIX + token;
+                    redisTemplate.opsForValue().set(key, "1", remainingTime, TimeUnit.MILLISECONDS);
+                }
             }
 
             log.info("User logged out successfully: {}", userId);
@@ -196,7 +200,7 @@ public class UserAuthServiceImpl implements UserAuthService {
 
     @Override
     public String refreshToken(String refreshToken) {
-        if (!jwtUtil.validateRefreshToken(refreshToken)) {
+        if (!jwtUtil.validateToken(refreshToken)) {
             throw new RuntimeException("刷新令牌无效或已过期");
         }
 
@@ -210,12 +214,12 @@ public class UserAuthServiceImpl implements UserAuthService {
         }
 
         // 生成新的访问Token
-        return jwtUtil.generateAccessToken(userId, username);
+        return jwtUtil.generateToken(userId, username);
     }
 
     @Override
     public UserVO validateToken(String token) {
-        if (!jwtUtil.validateAccessToken(token)) {
+        if (!jwtUtil.validateToken(token)) {
             return null;
         }
 
@@ -351,7 +355,7 @@ public class UserAuthServiceImpl implements UserAuthService {
      */
     private User loginWithSms(UserLoginDTO loginDTO) {
         if (!verifyCodeService.verifyCode(loginDTO.getAccount(), 
-                                         loginDTO.getVerifyCode(), "login")) {
+                                         loginDTO.getSmsCode(), "login")) {
             throw new RuntimeException("验证码错误或已过期");
         }
 
@@ -383,12 +387,10 @@ public class UserAuthServiceImpl implements UserAuthService {
     /**
      * 记录登录日志
      */
-    private void recordLoginLog(Long userId, String deviceType, String deviceInfo, Integer loginType) {
+    private void recordLoginLog(Long userId, String deviceType, String deviceInfo, String loginType) {
         UserLoginLog loginLog = UserLoginLog.builder()
                 .userId(userId)
                 .loginIp(getClientIp())
-                .deviceType(deviceType)
-                .deviceInfo(deviceInfo)
                 .loginType(loginType)
                 .loginStatus(1)
                 .loginTime(LocalDateTime.now())
@@ -443,7 +445,7 @@ public class UserAuthServiceImpl implements UserAuthService {
             throw new RuntimeException("密码不能为空");
         }
         
-        if ("sms".equals(loginDTO.getLoginType()) && !StringUtils.hasText(loginDTO.getVerifyCode())) {
+        if ("sms".equals(loginDTO.getLoginType()) && !StringUtils.hasText(loginDTO.getSmsCode())) {
             throw new RuntimeException("验证码不能为空");
         }
     }

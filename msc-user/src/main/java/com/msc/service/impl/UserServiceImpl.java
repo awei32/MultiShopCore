@@ -7,6 +7,8 @@ import com.msc.domain.dto.UserUpdateDTO;
 import com.msc.domain.entity.User;
 import com.msc.domain.entity.UserAddress;
 import com.msc.domain.entity.UserProfile;
+import com.msc.domain.enums.GenderEnum;
+import com.msc.domain.enums.RegisterSourceEnum;
 import com.msc.domain.vo.UserVO;
 import com.msc.mapper.UserAddressMapper;
 import com.msc.mapper.UserMapper;
@@ -489,10 +491,11 @@ public class UserServiceImpl implements UserService {
 
         // 设置性别描述
         if (user.getGender() != null) {
-            switch (user.getGender()) {
-                case 1 -> userVO.setGenderDesc("男");
-                case 2 -> userVO.setGenderDesc("女");
-                default -> userVO.setGenderDesc("未知");
+            GenderEnum genderEnum = GenderEnum.getByCode(user.getGender());
+            if (genderEnum != null) {
+                userVO.setGenderDesc(genderEnum.getDesc());
+            } else {
+                userVO.setGenderDesc("未知");
             }
         }
 
@@ -508,13 +511,11 @@ public class UserServiceImpl implements UserService {
 
         // 设置注册来源描述
         if (StringUtils.hasText(user.getRegisterSource())) {
-            switch (user.getRegisterSource()) {
-                case "web" -> userVO.setRegisterSourceDesc("网页");
-                case "app" -> userVO.setRegisterSourceDesc("手机应用");
-                case "wechat" -> userVO.setRegisterSourceDesc("微信");
-                case "alipay" -> userVO.setRegisterSourceDesc("支付宝");
-                case "qq" -> userVO.setRegisterSourceDesc("QQ");
-                default -> userVO.setRegisterSourceDesc(user.getRegisterSource());
+            RegisterSourceEnum sourceEnum = RegisterSourceEnum.getByCode(user.getRegisterSource());
+            if (sourceEnum != null) {
+                userVO.setRegisterSourceDesc(sourceEnum.getDesc());
+            } else {
+                userVO.setRegisterSourceDesc(user.getRegisterSource());
             }
         }
 

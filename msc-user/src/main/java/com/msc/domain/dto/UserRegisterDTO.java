@@ -9,7 +9,6 @@ import lombok.NoArgsConstructor;
 
 import jakarta.validation.constraints.*;
 
-import com.msc.domain.enums.GenderEnum;
 import com.msc.domain.enums.RegisterSourceEnum;
 
 /**
