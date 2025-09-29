@@ -7,6 +7,8 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import com.baomidou.mybatisplus.annotation.IdType;
+import com.baomidou.mybatisplus.annotation.TableId;
 import com.msc.domain.enums.MessageTypeEnum;
 
 /**
@@ -21,6 +23,7 @@ public class UserMessage {
     /**
      * 消息ID
      */
+    @TableId(value = "id", type = IdType.ASSIGN_ID)
     private Long id;
     
     /**

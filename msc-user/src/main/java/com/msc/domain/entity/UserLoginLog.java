@@ -23,7 +23,7 @@ public class UserLoginLog {
     /**
      * 日志ID
      */
-    @TableId(value = "id", type = IdType.AUTO)
+    @TableId(value = "id", type = IdType.ASSIGN_ID)
     private Long id;
     
     /**

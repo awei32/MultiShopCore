@@ -22,6 +22,7 @@ public class UserPreference {
     /**
      * 偏好ID
      */
+    @TableId(value = "id", type = IdType.ASSIGN_ID)
     private Long id;
     
     /**

@@ -104,7 +104,7 @@ public class UserServiceImpl implements UserService {
         log.info("User info updated successfully: {}", updateDTO.getId());
         return result > 0;
     }
-    
+
     //TODO: 头像上传
     @Transactional(rollbackFor = Exception.class)
     @Override
