@@ -1,8 +1,9 @@
 package com.msc.service.impl;
 
 import com.msc.service.VerifyCodeService;
+
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 
@@ -17,10 +18,10 @@ import java.util.regex.Pattern;
  */
 @Slf4j
 @Service
+@RequiredArgsConstructor
 public class VerifyCodeServiceImpl implements VerifyCodeService {
 
-    @Autowired
-    private StringRedisTemplate redisTemplate;
+    private final StringRedisTemplate redisTemplate;
 
     private static final String CODE_PREFIX = "verify_code:";
     private static final String LIMIT_PREFIX = "verify_limit:";
@@ -29,6 +30,8 @@ public class VerifyCodeServiceImpl implements VerifyCodeService {
     private static final int SEND_LIMIT_MINUTES = 1;
     private static final Pattern PHONE_PATTERN = Pattern.compile("^1[3-9]\\d{9}$");
     private static final Pattern EMAIL_PATTERN = Pattern.compile("^[A-Za-z0-9+_.-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$");
+
+
 
     @Override
     public Boolean sendSmsCode(String phone, String type) {

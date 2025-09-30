@@ -16,9 +16,11 @@ import com.msc.mapper.UserProfileMapper;
 import com.msc.service.UserAuthService;
 import com.msc.service.VerifyCodeService;
 import com.msc.util.PasswordUtil;
+
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.BeanUtils;
-import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -37,32 +39,22 @@ import static com.msc.domain.enums.LoginTypeEnum.*;
  */
 @Slf4j
 @Service
+@RequiredArgsConstructor
 public class UserAuthServiceImpl implements UserAuthService {
 
-    @Autowired
-    private UserMapper userMapper;
-
-    @Autowired
-    private UserProfileMapper userProfileMapper;
-
-    @Autowired
-    private UserPreferenceMapper userPreferenceMapper;
-
-    @Autowired
-    private UserLoginLogMapper userLoginLogMapper;
-
-    @Autowired
-    private VerifyCodeService verifyCodeService;
-
-    @Autowired
-    private JwtUtil jwtUtil;
-
-    @Autowired
-    private StringRedisTemplate redisTemplate;
+    private final UserMapper userMapper;
+    private final UserProfileMapper userProfileMapper;
+    private final UserPreferenceMapper userPreferenceMapper;
+    private final UserLoginLogMapper userLoginLogMapper;
+    private final VerifyCodeService verifyCodeService;
+    private final JwtUtil jwtUtil;
+    private final StringRedisTemplate redisTemplate;
 
     private static final String TOKEN_BLACKLIST_PREFIX = "token_blacklist:";
     private static final Pattern PHONE_PATTERN = Pattern.compile("^1[3-9]\\d{9}$");
     private static final Pattern EMAIL_PATTERN = Pattern.compile("^[A-Za-z0-9+_.-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$");
+
+
 
     @Override
     @Transactional(rollbackFor = Exception.class)

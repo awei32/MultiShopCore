@@ -3,7 +3,9 @@ package com.msc.filter;
 import com.alibaba.fastjson2.JSON;
 import com.msc.common.constant.JwtConstants;
 import com.msc.common.util.JwtUtil;
-import org.springframework.beans.factory.annotation.Autowired;
+
+import lombok.RequiredArgsConstructor;
+
 import org.springframework.cloud.gateway.filter.GatewayFilterChain;
 import org.springframework.cloud.gateway.filter.GlobalFilter;
 import org.springframework.core.Ordered;
@@ -29,10 +31,10 @@ import java.util.Map;
  * 在网关层面进行JWT token验证
  */
 @Component
+@RequiredArgsConstructor
 public class JwtAuthenticationFilter implements GlobalFilter, Ordered {
 
-    @Autowired
-    private JwtUtil jwtUtil;
+    private final JwtUtil jwtUtil;
 
     // 使用公共常量类
 
@@ -46,6 +48,7 @@ public class JwtAuthenticationFilter implements GlobalFilter, Ordered {
             "/actuator",
             "/favicon.ico"
     );
+
 
     @Override
     public Mono<Void> filter(ServerWebExchange exchange, GatewayFilterChain chain) {
