@@ -21,7 +21,6 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.BeanUtils;
 import org.springframework.data.redis.core.RedisTemplate;
-import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -48,9 +47,11 @@ public class UserAuthServiceImpl implements UserAuthService {
     private final UserLoginLogMapper userLoginLogMapper;
     private final VerifyCodeService verifyCodeService;
     private final JwtUtil jwtUtil;
-    private final StringRedisTemplate redisTemplate;
+    private final RedisTemplate<String, Object> redisTemplate;
 
     private static final String TOKEN_BLACKLIST_PREFIX = "token_blacklist:";
+    private static final String USER_TOKEN_CACHE_PREFIX = "user_token:";
+    private static final long TOKEN_CACHE_EXPIRE = 24; // 小时
     private static final Pattern PHONE_PATTERN = Pattern.compile("^1[3-9]\\d{9}$");
     private static final Pattern EMAIL_PATTERN = Pattern.compile("^[A-Za-z0-9+_.-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$");
 
@@ -116,6 +117,9 @@ public class UserAuthServiceImpl implements UserAuthService {
         String accessToken = jwtUtil.generateToken(user.getId(), user.getUsername());
         String refreshToken = jwtUtil.generateToken(user.getId(), user.getUsername());
         
+        // 将Token存储到Redis缓存中
+        cacheUserToken(user.getId(), accessToken);
+        
         // 注意：实际项目中Token应该通过响应头或其他方式返回，这里仅作演示
         log.info("Generated tokens for user: {}", user.getUsername());
 
@@ -163,6 +167,9 @@ public class UserAuthServiceImpl implements UserAuthService {
         String accessToken = jwtUtil.generateToken(user.getId(), user.getUsername());
         String refreshToken = jwtUtil.generateToken(user.getId(), user.getUsername());
         
+        // 将Token存储到Redis缓存中
+        cacheUserToken(user.getId(), accessToken);
+        
         // 注意：实际项目中Token应该通过响应头或其他方式返回，这里仅作演示
         log.info("Generated tokens for user: {}", user.getUsername());
 
@@ -181,6 +188,9 @@ public class UserAuthServiceImpl implements UserAuthService {
                     redisTemplate.opsForValue().set(key, "1", remainingTime, TimeUnit.MILLISECONDS);
                 }
             }
+
+            // 清除用户Token缓存
+            clearUserTokenCache(userId);
 
             log.info("User logged out successfully: {}", userId);
             return true;
@@ -206,7 +216,12 @@ public class UserAuthServiceImpl implements UserAuthService {
         }
 
         // 生成新的访问Token
-        return jwtUtil.generateToken(userId, username);
+        String newToken = jwtUtil.generateToken(userId, username);
+        
+        // 更新Redis缓存
+        cacheUserToken(userId, newToken);
+        
+        return newToken;
     }
 
     @Override
@@ -222,13 +237,25 @@ public class UserAuthServiceImpl implements UserAuthService {
         }
 
         Long userId = jwtUtil.getUserIdFromToken(token);
+        
+        // 首先尝试从Redis缓存获取用户信息
+        UserVO cachedUser = getCachedUser(userId);
+        if (cachedUser != null) {
+            return cachedUser;
+        }
+        
         User user = userMapper.selectById(userId);
         
         if (user == null || Integer.valueOf(0).equals(user.getStatus())) {
             return null;
         }
 
-        return convertToUserVO(user);
+        UserVO userVO = convertToUserVO(user);
+        
+        // 将用户信息缓存到Redis
+        cacheUser(userVO);
+        
+        return userVO;
     }
 
     @Override
@@ -272,6 +299,9 @@ public class UserAuthServiceImpl implements UserAuthService {
         
         int result = userMapper.updateById(user);
         
+        // 清除用户Token缓存
+        clearUserTokenCache(user.getId());
+        
         log.info("Password reset successfully for user: {}", user.getUsername());
         return result > 0;
     }
@@ -301,6 +331,9 @@ public class UserAuthServiceImpl implements UserAuthService {
         
         int result = userMapper.updateById(user);
         
+        // 清除用户Token缓存
+        clearUserTokenCache(userId);
+        
         log.info("Password changed successfully for user: {}", user.getUsername());
         return result > 0;
     }
@@ -324,6 +357,80 @@ public class UserAuthServiceImpl implements UserAuthService {
         LambdaQueryWrapper<User> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(User::getPhone, phone);
         return userMapper.selectCount(wrapper) == 0;
+    }
+
+    /**
+     * 缓存用户Token
+     * @param userId 用户ID
+     * @param token JWT Token
+     */
+    private void cacheUserToken(Long userId, String token) {
+        try {
+            String key = USER_TOKEN_CACHE_PREFIX + userId;
+            redisTemplate.opsForValue().set(key, token, TOKEN_CACHE_EXPIRE, TimeUnit.HOURS);
+        } catch (Exception e) {
+            log.error("Failed to cache user token for user: {}", userId, e);
+        }
+    }
+
+    /**
+     * 从缓存获取用户Token
+     * @param userId 用户ID
+     * @return JWT Token
+     */
+    private String getCachedUserToken(Long userId) {
+        try {
+            String key = USER_TOKEN_CACHE_PREFIX + userId;
+            Object obj = redisTemplate.opsForValue().get(key);
+            return obj instanceof String ? (String) obj : null;
+        } catch (Exception e) {
+            log.error("Failed to get cached user token for user: {}", userId, e);
+            return null;
+        }
+    }
+
+    /**
+     * 缓存用户信息
+     * @param userVO 用户信息
+     */
+    private void cacheUser(UserVO userVO) {
+        try {
+            String key = "user:" + userVO.getId();
+            redisTemplate.opsForValue().set(key, userVO, TOKEN_CACHE_EXPIRE, TimeUnit.HOURS);
+        } catch (Exception e) {
+            log.error("Failed to cache user info for user: {}", userVO.getId(), e);
+        }
+    }
+
+    /**
+     * 从缓存获取用户信息
+     * @param userId 用户ID
+     * @return 用户信息
+     */
+    private UserVO getCachedUser(Long userId) {
+        try {
+            String key = "user:" + userId;
+            Object obj = redisTemplate.opsForValue().get(key);
+            return obj instanceof UserVO ? (UserVO) obj : null;
+        } catch (Exception e) {
+            log.error("Failed to get cached user info for user: {}", userId, e);
+            return null;
+        }
+    }
+
+    /**
+     * 清除用户Token缓存
+     * @param userId 用户ID
+     */
+    private void clearUserTokenCache(Long userId) {
+        try {
+            String tokenKey = USER_TOKEN_CACHE_PREFIX + userId;
+            String userKey = "user:" + userId;
+            redisTemplate.delete(tokenKey);
+            redisTemplate.delete(userKey);
+        } catch (Exception e) {
+            log.error("Failed to clear user token cache for user: {}", userId, e);
+        }
     }
 
     /**
