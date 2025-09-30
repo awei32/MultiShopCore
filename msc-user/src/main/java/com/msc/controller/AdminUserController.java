@@ -26,7 +26,7 @@ import java.util.Map;
  */
 @Slf4j
 @RestController
-@RequestMapping("/api/v1/admin/users")
+@RequestMapping("/api/v1/user/admin/")
 @RequiredArgsConstructor
 @Validated
 @Tag(name = "管理员用户管理", description = "管理员用户管理相关接口")
