@@ -9,6 +9,8 @@ import com.msc.domain.entity.UserAddress;
 import com.msc.domain.entity.UserProfile;
 import com.msc.domain.enums.GenderEnum;
 import com.msc.domain.enums.RegisterSourceEnum;
+import com.msc.common.util.MinioUtil;
+import com.msc.config.FileUploadConfig;
 import com.msc.domain.vo.UserVO;
 import com.msc.mapper.UserAddressMapper;
 import com.msc.mapper.UserMapper;
@@ -16,6 +18,7 @@ import com.msc.mapper.UserProfileMapper;
 import com.msc.service.UserService;
 import com.msc.service.VerifyCodeService;
 import com.msc.util.PasswordUtil;
+import io.minio.PutObjectArgs;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -49,6 +52,12 @@ public class UserServiceImpl implements UserService {
 
     @Autowired
     private VerifyCodeService verifyCodeService;
+
+    @Autowired
+    private MinioUtil minioUtil;
+
+    @Autowired
+    private FileUploadConfig fileUploadConfig;
 
     @Override
     public UserVO getUserById(Long userId) {
@@ -105,11 +114,64 @@ public class UserServiceImpl implements UserService {
         return result > 0;
     }
 
+
+    
     //TODO: 头像上传
     @Transactional(rollbackFor = Exception.class)
     @Override
-    public Boolean updateAvatar(Long userId, MultipartFile avatarUrl) {
-        return null;
+    public Boolean updateAvatar(Long userId, MultipartFile avatarFile) {
+        try {
+            // 检查文件是否为空
+            if (avatarFile.isEmpty()) {
+                throw new RuntimeException("上传文件不能为空");
+            }
+
+            // 检查文件大小
+            long maxSize = parseSize(fileUploadConfig.getAvatar().getMaxSize());
+            if (avatarFile.getSize() > maxSize) {
+                throw new RuntimeException("文件大小超出限制");
+            }
+
+            // 检查文件类型
+            String fileName = avatarFile.getOriginalFilename();
+            if (fileName == null || fileName.lastIndexOf(".") == -1) {
+                throw new RuntimeException("文件格式不正确");
+            }
+
+            String fileExtension = fileName.substring(fileName.lastIndexOf(".") + 1).toLowerCase();
+            if (!fileUploadConfig.getAvatar().getAllowedTypes().contains(fileExtension)) {
+                throw new RuntimeException("不支持的文件格式");
+            }
+
+            // 生成唯一文件名
+            String uniqueFileName = "avatar/" + userId + "/" + System.currentTimeMillis() + "." + fileExtension;
+
+            // 上传文件到MinIO
+            minioUtil.getMinioClient().putObject(
+                    PutObjectArgs.builder()
+                            .bucket(minioUtil.getBucketName())
+                            .object(uniqueFileName)
+                            .stream(avatarFile.getInputStream(), avatarFile.getSize(), -1)
+                            .contentType(avatarFile.getContentType())
+                            .build()
+            );
+
+            // 构造文件访问URL
+            String fileUrl = minioUtil.getEndpoint() + "/" + minioUtil.getBucketName() + "/" + uniqueFileName;
+
+            // 更新用户头像URL
+            LambdaUpdateWrapper<User> wrapper = new LambdaUpdateWrapper<>();
+            wrapper.eq(User::getId, userId)
+                    .set(User::getAvatar, fileUrl)
+                    .set(User::getUpdateTime, LocalDateTime.now());
+
+            int result = userMapper.update(null, wrapper);
+            log.info("User avatar updated successfully: {}", userId);
+            return result > 0;
+        } catch (Exception e) {
+            log.error("头像上传失败", e);
+            throw new RuntimeException("头像上传失败: " + e.getMessage());
+        }
     }
 
     // @Transactional(rollbackFor = Exception.class)
@@ -597,5 +659,37 @@ public class UserServiceImpl implements UserService {
             return phone;
         }
         return phone.substring(0, 3) + "****" + phone.substring(7);
+    }
+
+    /**
+     * 解析文件大小配置
+     *
+     * @param sizeStr 大小字符串，如"5MB", "10KB"
+     * @return 字节大小
+     */
+    private long parseSize(String sizeStr) {
+        if (sizeStr == null || sizeStr.isEmpty()) {
+            return 0;
+        }
+
+        sizeStr = sizeStr.toUpperCase();
+        long multiplier = 1;
+
+        if (sizeStr.endsWith("KB")) {
+            multiplier = 1024;
+            sizeStr = sizeStr.substring(0, sizeStr.length() - 2);
+        } else if (sizeStr.endsWith("MB")) {
+            multiplier = 1024 * 1024;
+            sizeStr = sizeStr.substring(0, sizeStr.length() - 2);
+        } else if (sizeStr.endsWith("GB")) {
+            multiplier = 1024 * 1024 * 1024;
+            sizeStr = sizeStr.substring(0, sizeStr.length() - 2);
+        }
+
+        try {
+            return Long.parseLong(sizeStr) * multiplier;
+        } catch (NumberFormatException e) {
+            return 0;
+        }
     }
 }
