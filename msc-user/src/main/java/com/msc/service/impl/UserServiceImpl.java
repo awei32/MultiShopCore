@@ -27,6 +27,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.io.InputStream;
 import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.List;
@@ -45,142 +46,102 @@ public class UserServiceImpl implements UserService {
     private final UserMapper userMapper;
     private final UserProfileMapper userProfileMapper;
     private final UserAddressMapper userAddressMapper;
-    private final VerifyCodeService verifyCodeService;
     private final MinioUtil minioUtil;
     private final FileUploadConfig fileUploadConfig;
-
+    private final VerifyCodeService verifyCodeService;
 
     @Override
     public UserVO getUserById(Long userId) {
         User user = userMapper.selectById(userId);
         if (user == null) {
-            return null;
-        }
-        return convertToUserVO(user);
-    }
-
-    @Override
-    public UserVO getUserByUsername(String username) {
-        LambdaQueryWrapper<User> wrapper = new LambdaQueryWrapper<>();
-        wrapper.eq(User::getUsername, username)
-                .eq(User::getIsDeleted, 0);
-        User user = userMapper.selectOne(wrapper);
-        if (user == null) {
-            return null;
-        }
-        return convertToUserVO(user);
-    }
-
-    @Override
-    @Transactional(rollbackFor = Exception.class)
-    public Boolean updateUserInfo(UserUpdateDTO updateDTO) {
-        User user = userMapper.selectById(updateDTO.getId());
-        if (user == null) {
             throw new RuntimeException("用户不存在");
         }
 
-        // 更新基本信息
-        if (StringUtils.hasText(updateDTO.getNickname())) {
-            user.setNickname(updateDTO.getNickname());
-        }
-        if (updateDTO.getGender() != null) {
-            user.setGender(updateDTO.getGender());
-        }
-        if (updateDTO.getBirthday() != null) {
-            user.setBirthday(updateDTO.getBirthday());
-        }
-        if (StringUtils.hasText(updateDTO.getAvatar())) {
-            user.setAvatar(updateDTO.getAvatar());
-        }
+        return convertToUserVO(user);
+    }
 
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public Boolean updateUserInfo(UserUpdateDTO userUpdateDTO) {
+        // 更新用户基本信息
+        User user = new User();
+        user.setId(userUpdateDTO.getId());
+        user.setNickname(userUpdateDTO.getNickname());
+        user.setAvatar(userUpdateDTO.getAvatar());
+        user.setGender(userUpdateDTO.getGender());
+        user.setBirthday(userUpdateDTO.getBirthday());
         user.setUpdateTime(LocalDateTime.now());
+
         int result = userMapper.updateById(user);
 
-        // 更新详细资料
-        if (hasProfileInfo(updateDTO)) {
-            updateUserProfileInfo(updateDTO);
+        // 更新用户详细资料
+        if (hasProfileInfo(userUpdateDTO)) {
+            updateUserProfileInfo(userUpdateDTO);
         }
 
-        log.info("User info updated successfully: {}", updateDTO.getId());
+        log.info("User info updated successfully: {}", userUpdateDTO.getId());
         return result > 0;
     }
 
-
-    
-    //TODO: 头像上传
-    @Transactional(rollbackFor = Exception.class)
     @Override
-    public Boolean updateAvatar(Long userId, MultipartFile avatarFile) {
-        try {
-            // 检查文件是否为空
-            if (avatarFile.isEmpty()) {
-                throw new RuntimeException("上传文件不能为空");
+    @Transactional(rollbackFor = Exception.class)
+    public Boolean updateAvatar(Long userId, MultipartFile file) {
+        if (file == null || file.isEmpty()) {
+            throw new RuntimeException("文件不能为空");
+        }
+
+        try(InputStream inputStream = file.getInputStream()) {
+            // 上传文件到MinIO并获取URL
+            String fileName = "avatar/" + userId + "/" + System.currentTimeMillis() + "-" + file.getOriginalFilename();
+            String fileUrl = minioUtil.uploadFileAndGetUrl(fileName, inputStream);
+            
+            if (fileUrl == null) {
+                throw new RuntimeException("文件上传失败");
             }
 
-            // 检查文件大小
-            long maxSize = parseSize(fileUploadConfig.getAvatar().getMaxSize());
-            if (avatarFile.getSize() > maxSize) {
-                throw new RuntimeException("文件大小超出限制");
-            }
-
-            // 检查文件类型
-            String fileName = avatarFile.getOriginalFilename();
-            if (fileName == null || fileName.lastIndexOf(".") == -1) {
-                throw new RuntimeException("文件格式不正确");
-            }
-
-            String fileExtension = fileName.substring(fileName.lastIndexOf(".") + 1).toLowerCase();
-            if (!fileUploadConfig.getAvatar().getAllowedTypes().contains(fileExtension)) {
-                throw new RuntimeException("不支持的文件格式");
-            }
-
-            // 生成唯一文件名
-            String uniqueFileName = "avatar/" + userId + "/" + System.currentTimeMillis() + "." + fileExtension;
-
-            // 上传文件到MinIO
-            minioUtil.getMinioClient().putObject(
-                    PutObjectArgs.builder()
-                            .bucket(minioUtil.getBucketName())
-                            .object(uniqueFileName)
-                            .stream(avatarFile.getInputStream(), avatarFile.getSize(), -1)
-                            .contentType(avatarFile.getContentType())
-                            .build()
-            );
-
-            // 构造文件访问URL
-            String fileUrl = minioUtil.getEndpoint() + "/" + minioUtil.getBucketName() + "/" + uniqueFileName;
-
-            // 更新用户头像URL
+            // 更新用户头像
             LambdaUpdateWrapper<User> wrapper = new LambdaUpdateWrapper<>();
             wrapper.eq(User::getId, userId)
                     .set(User::getAvatar, fileUrl)
                     .set(User::getUpdateTime, LocalDateTime.now());
 
             int result = userMapper.update(null, wrapper);
-            log.info("User avatar updated successfully: {}", userId);
+            log.info("Avatar updated successfully: {} -> {}", userId, fileUrl);
             return result > 0;
         } catch (Exception e) {
-            log.error("头像上传失败", e);
-            throw new RuntimeException("头像上传失败: " + e.getMessage());
+            log.error("Failed to update avatar for user: {}", userId, e);
+            throw new RuntimeException("头像更新失败");
         }
     }
 
-    // @Transactional(rollbackFor = Exception.class)
-    // @Override
-    // public Boolean updateAvatar(Long userId, String avatarUrl) {
-    // if (!StringUtils.hasText(avatarUrl)) {
-    // throw new RuntimeException("头像URL不能为空");
-    // }
-    //
-    // LambdaUpdateWrapper<User> wrapper = new LambdaUpdateWrapper<>();
-    // wrapper.eq(User::getId, userId)
-    // .set(User::getAvatar, avatarUrl)
-    // .set(User::getUpdateTime, LocalDateTime.now());
-    //
-    // int result = userMapper.update(null, wrapper);
-    // log.info("User avatar updated successfully: {}", userId);
-    // return result > 0;
-    // }
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public Boolean updatePassword(Long userId, String oldPassword, String newPassword) {
+        // 验证新密码格式
+        if (!PasswordUtil.isValidPassword(newPassword)) {
+            throw new RuntimeException("新密码格式不符合要求");
+        }
+
+        // 查找用户
+        User user = userMapper.selectById(userId);
+        if (user == null) {
+            throw new RuntimeException("用户不存在");
+        }
+
+        // 验证旧密码
+        if (!PasswordUtil.matches(oldPassword, user.getPassword())) {
+            throw new RuntimeException("原密码错误");
+        }
+
+        // 更新密码
+        user.setPassword(PasswordUtil.encode(newPassword));
+        user.setUpdateTime(LocalDateTime.now());
+
+        int result = userMapper.updateById(user);
+
+        log.info("Password updated successfully for user: {}", userId);
+        return result > 0;
+    }
 
     @Override
     @Transactional(rollbackFor = Exception.class)
@@ -293,23 +254,16 @@ public class UserServiceImpl implements UserService {
         // 验证地址是否属于该用户
         UserAddress address = userAddressMapper.selectById(addressId);
         if (address == null || !userId.equals(address.getUserId())) {
-            throw new RuntimeException("地址不存在或无权限设置");
+            throw new RuntimeException("地址不存在或无权限设置默认地址");
         }
 
-        // 取消所有默认地址
-        LambdaUpdateWrapper<UserAddress> defaultWrapper = new LambdaUpdateWrapper<>();
-        defaultWrapper.eq(UserAddress::getUserId, userId)
-                .set(UserAddress::getIsDefault, 0);
-        userAddressMapper.update(null, defaultWrapper);
+        // 取消之前的默认地址
+        userAddressMapper.cancelDefaultByUserId(userId);
 
         // 设置新的默认地址
-        LambdaUpdateWrapper<UserAddress> setDefaultWrapper = new LambdaUpdateWrapper<>();
-        setDefaultWrapper.eq(UserAddress::getId, addressId)
-                .set(UserAddress::getIsDefault, 1);
-        userAddressMapper.update(null, setDefaultWrapper);
-
+        int result = userAddressMapper.setDefault(addressId, userId);
         log.info("Default address set successfully: {} -> {}", userId, addressId);
-        return true;
+        return result > 0;
     }
 
     @Override
@@ -373,22 +327,21 @@ public class UserServiceImpl implements UserService {
                 .set(User::getUpdateTime, LocalDateTime.now());
 
         int result = userMapper.update(null, wrapper);
-        log.info("Batch update user status successfully: {} users -> {}", userIds.size(), status);
+        log.info("Batch update user status successfully: {} users -> status {}", userIds.size(), status);
         return result > 0;
     }
 
     @Override
-    public Map<String, Object> getUserStatistics() {
+    public Object getUserStatistics() {
         Map<String, Object> statistics = new HashMap<>();
 
-        // 用户总数统计
-        LambdaQueryWrapper<User> totalWrapper = new LambdaQueryWrapper<>();
-        statistics.put("totalUsers", userMapper.selectCount(totalWrapper));
+        // 总用户数统计
+        statistics.put("totalUsers", userMapper.selectCount(null));
 
-        // 正常用户统计
-        LambdaQueryWrapper<User> normalWrapper = new LambdaQueryWrapper<>();
-        normalWrapper.eq(User::getStatus, 1);
-        statistics.put("normalUsers", userMapper.selectCount(normalWrapper));
+        // 按状态统计
+        LambdaQueryWrapper<User> activeWrapper = new LambdaQueryWrapper<>();
+        activeWrapper.eq(User::getStatus, 1);
+        statistics.put("activeUsers", userMapper.selectCount(activeWrapper));
 
         // 禁用用户统计
         LambdaQueryWrapper<User> disabledWrapper = new LambdaQueryWrapper<>();
@@ -403,7 +356,6 @@ public class UserServiceImpl implements UserService {
         return statistics;
     }
 
-    @Override
     @Transactional(rollbackFor = Exception.class)
     public Boolean realNameVerification(Long userId, String realName, String idCard) {
         if (!StringUtils.hasText(realName) || !StringUtils.hasText(idCard)) {
@@ -507,7 +459,7 @@ public class UserServiceImpl implements UserService {
         return result > 0;
     }
 
-    @Override
+    
     @Transactional(rollbackFor = Exception.class)
     public Boolean deleteAccount(Long userId, String password) {
         User user = userMapper.selectById(userId);
@@ -531,52 +483,36 @@ public class UserServiceImpl implements UserService {
         return result > 0;
     }
 
-    // TODO: 实名认证待完善
     @Override
     public Boolean verifyUser(Long userId, String realName, String idCard) {
-        return null;
+        return realNameVerification(userId, realName, idCard);
     }
 
-    /**
-     * 转换为UserVO
-     */
-    private UserVO convertToUserVO(User user) {
-        UserVO userVO = new UserVO();
-        BeanUtils.copyProperties(user, userVO);
+     /**
+      * 转换为UserVO
+      */
+     private UserVO convertToUserVO(User user) {
+         UserVO userVO = new UserVO();
+         BeanUtils.copyProperties(user, userVO);
 
-        // 设置性别描述
-        if (user.getGender() != null) {
-            GenderEnum genderEnum = GenderEnum.getByCode(user.getGender());
-            if (genderEnum != null) {
-                userVO.setGenderDesc(genderEnum.getDesc());
-            } else {
-                userVO.setGenderDesc("未知");
-            }
-        }
+         // 设置枚举描述
+         if (user.getGender() != null) {
+             GenderEnum genderEnum = GenderEnum.getByCode(user.getGender());
+             if (genderEnum != null) {
+                 userVO.setGenderDesc(genderEnum.getDesc());
+             }
+         }
 
-        // 设置状态描述
-        if (user.getStatus() != null) {
-            switch (user.getStatus()) {
-                case 0 -> userVO.setStatusDesc("禁用");
-                case 1 -> userVO.setStatusDesc("正常");
-                case 2 -> userVO.setStatusDesc("锁定");
-                default -> userVO.setStatusDesc("未知");
-            }
-        }
+         if (StringUtils.hasText(user.getRegisterSource())) {
+             RegisterSourceEnum sourceEnum = RegisterSourceEnum.getByCode(user.getRegisterSource());
+             if (sourceEnum != null) {
+                 userVO.setRegisterSourceDesc(sourceEnum.getDesc());
+             }
+         }
 
-        // 设置注册来源描述
-        if (StringUtils.hasText(user.getRegisterSource())) {
-            RegisterSourceEnum sourceEnum = RegisterSourceEnum.getByCode(user.getRegisterSource());
-            if (sourceEnum != null) {
-                userVO.setRegisterSourceDesc(sourceEnum.getDesc());
-            } else {
-                userVO.setRegisterSourceDesc(user.getRegisterSource());
-            }
-        }
-
-        // 设置认证状态描述
-        if (user.getIsVerified() != null) {
-            userVO.setVerifiedDesc(Integer.valueOf(1).equals(user.getIsVerified()) ? "已认证" : "未认证");
+        // 邮箱脱敏
+        if (StringUtils.hasText(user.getEmail())) {
+            userVO.setEmail(maskEmail(user.getEmail()));
         }
 
         // 手机号脱敏
@@ -622,7 +558,12 @@ public class UserServiceImpl implements UserService {
 
         profile.setUpdateTime(LocalDateTime.now());
 
-        if (profile.getId() != null) {
+        LambdaQueryWrapper<UserProfile> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(UserProfile::getUserId, updateDTO.getId());
+        UserProfile existingProfile = userProfileMapper.selectOne(wrapper);
+
+        if (existingProfile != null) {
+            profile.setId(existingProfile.getId());
             userProfileMapper.updateById(profile);
         } else {
             userProfileMapper.insert(profile);
@@ -630,57 +571,35 @@ public class UserServiceImpl implements UserService {
     }
 
     /**
-     * 验证身份证号格式
+     * 邮箱脱敏
      */
-    private boolean isValidIdCard(String idCard) {
-        if (idCard == null || idCard.length() != 18) {
-            return false;
+    private String maskEmail(String email) {
+        if (!StringUtils.hasText(email) || !email.contains("@")) {
+            return email;
         }
-
-        // 简单的身份证号格式验证
-        return idCard
-                .matches("^[1-9]\\d{5}(18|19|20)\\d{2}((0[1-9])|(1[0-2]))(([0-2][1-9])|10|20|30|31)\\d{3}[0-9Xx]$");
+        String[] parts = email.split("@");
+        String username = parts[0];
+        if (username.length() <= 2) {
+            return email;
+        }
+        return username.substring(0, 2) + "***@" + parts[1];
     }
 
     /**
      * 手机号脱敏
      */
     private String maskPhone(String phone) {
-        if (phone == null || phone.length() != 11) {
+        if (!StringUtils.hasText(phone) || phone.length() < 11) {
             return phone;
         }
         return phone.substring(0, 3) + "****" + phone.substring(7);
     }
 
     /**
-     * 解析文件大小配置
-     *
-     * @param sizeStr 大小字符串，如"5MB", "10KB"
-     * @return 字节大小
+     * 验证身份证号格式
      */
-    private long parseSize(String sizeStr) {
-        if (sizeStr == null || sizeStr.isEmpty()) {
-            return 0;
-        }
-
-        sizeStr = sizeStr.toUpperCase();
-        long multiplier = 1;
-
-        if (sizeStr.endsWith("KB")) {
-            multiplier = 1024;
-            sizeStr = sizeStr.substring(0, sizeStr.length() - 2);
-        } else if (sizeStr.endsWith("MB")) {
-            multiplier = 1024 * 1024;
-            sizeStr = sizeStr.substring(0, sizeStr.length() - 2);
-        } else if (sizeStr.endsWith("GB")) {
-            multiplier = 1024 * 1024 * 1024;
-            sizeStr = sizeStr.substring(0, sizeStr.length() - 2);
-        }
-
-        try {
-            return Long.parseLong(sizeStr) * multiplier;
-        } catch (NumberFormatException e) {
-            return 0;
-        }
+    private boolean isValidIdCard(String idCard) {
+        // 简单的身份证号格式验证，实际项目中应该使用更复杂的验证逻辑
+        return idCard != null && (idCard.length() == 18 || idCard.length() == 15);
     }
 }

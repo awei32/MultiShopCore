@@ -6,11 +6,9 @@ import com.msc.domain.entity.User;
 import com.msc.domain.entity.UserAddress;
 import com.msc.domain.entity.UserProfile;
 import com.msc.domain.vo.UserVO;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
-
-import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.multipart.MultipartFile;
 
 /**
  * 用户信息管理服务接口
@@ -20,40 +18,39 @@ import org.springframework.web.multipart.MultipartFile;
 public interface UserService {
 
     /**
-     * 根据用户ID获取用户信息
+     * 根据ID获取用户信息
      * 
      * @param userId 用户ID
-     * @return 用户信息VO
+     * @return 用户信息
      */
     UserVO getUserById(Long userId);
 
     /**
-     * 根据用户名获取用户信息
-     * 
-     * @param username 用户名
-     * @return 用户信息VO
-     */
-    UserVO getUserByUsername(String username);
-
-    /**
      * 更新用户基本信息
-     *
-     * @param updateDTO 更新信息DTO
+     * 
+     * @param userUpdateDTO 用户更新信息
      * @return 是否更新成功
      */
-    Boolean updateUserInfo(UserUpdateDTO updateDTO);
+    Boolean updateUserInfo(UserUpdateDTO userUpdateDTO);
 
     /**
      * 更新用户头像
      * 
      * @param userId    用户ID
-     * @param avatarUrl 头像URL
+     * @param file 文件
      * @return 是否更新成功
      */
-    Boolean updateAvatar(Long userId, MultipartFile avatarUrl);
+    Boolean updateAvatar(Long userId, MultipartFile file);
 
-//    @Transactional(rollbackFor = Exception.class)
-//    Boolean updateAvatar(Long userId, String avatarUrl);
+    /**
+     * 更新用户密码
+     * 
+     * @param userId 用户ID
+     * @param oldPassword 旧密码
+     * @param newPassword 新密码
+     * @return 是否更新成功
+     */
+    Boolean updatePassword(Long userId, String oldPassword, String newPassword);
 
     /**
      * 更新用户状态
@@ -163,43 +160,24 @@ public interface UserService {
     Object getUserStatistics();
 
     /**
-     * 实名认证
-     * 
-     * @param userId   用户ID
-     * @param realName 真实姓名
-     * @param idCard   身份证号
-     * @return 是否认证成功
-     */
-    Boolean realNameVerification(Long userId, String realName, String idCard);
-
-    /**
      * 绑定手机号
      * 
-     * @param userId     用户ID
-     * @param phone      手机号
-     * @param verifyCode 验证码
+     * @param userId 用户ID
+     * @param phone  手机号
+     * @param code   验证码
      * @return 是否绑定成功
      */
-    Boolean bindPhone(Long userId, String phone, String verifyCode);
+    Boolean bindPhone(Long userId, String phone, String code);
 
     /**
      * 绑定邮箱
      * 
-     * @param userId     用户ID
-     * @param email      邮箱
-     * @param verifyCode 验证码
+     * @param userId 用户ID
+     * @param email  邮箱
+     * @param code   验证码
      * @return 是否绑定成功
      */
-    Boolean bindEmail(Long userId, String email, String verifyCode);
-
-    /**
-     * 注销用户账号
-     * 
-     * @param userId   用户ID
-     * @param password 密码
-     * @return 是否注销成功
-     */
-    Boolean deleteAccount(Long userId, String password);
+    Boolean bindEmail(Long userId, String email, String code);
 
     /**
      * 实名认证
