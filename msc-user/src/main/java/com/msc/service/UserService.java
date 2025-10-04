@@ -188,4 +188,13 @@ public interface UserService {
      * @return 是否认证成功
      */
     Boolean verifyUser(Long userId, String realName, String idCard);
+
+    /**
+     * 删除用户账户
+     * 
+     * @param userId   用户ID
+     * @param password 密码，用于验证
+     * @return 是否删除成功
+     */
+    Boolean deleteAccount(Long userId, String password);
 }

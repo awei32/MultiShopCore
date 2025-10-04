@@ -93,7 +93,8 @@ public class AdminUserController {
     @DeleteMapping("/{id}")
     @Operation(summary = "删除用户账户")
     public Result<Void> deleteAccount(
-            @Parameter(description = "用户ID") @PathVariable Long id,@Parameter(description = "密码") @PathVariable String password) {
+            @Parameter(description = "用户ID") @PathVariable Long id,
+            @Parameter(description = "密码") @RequestParam String password) {
         userService.deleteAccount(id, password);
         return Result.success();
     }
