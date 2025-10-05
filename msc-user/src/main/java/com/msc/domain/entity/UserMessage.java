@@ -9,6 +9,8 @@ import lombok.NoArgsConstructor;
 
 import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableId;
+import com.baomidou.mybatisplus.annotation.TableField;
+import com.baomidou.mybatisplus.annotation.TableName;
 import com.msc.domain.enums.MessageTypeEnum;
 
 /**
@@ -18,6 +20,7 @@ import com.msc.domain.enums.MessageTypeEnum;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
+@TableName("user_message")
 public class UserMessage {
     
     /**
@@ -29,76 +32,91 @@ public class UserMessage {
     /**
      * 用户ID
      */
+    @TableField("user_id")
     private Long userId;
     
     /**
      * 消息类型:1-系统消息,2-订单消息,3-活动消息,4-客服消息
      */
+    @TableField("message_type")
     private Integer messageType;
     
     /**
      * 消息标题
      */
+    @TableField("title")
     private String title;
     
     /**
      * 消息内容
      */
+    @TableField("content")
     private String content;
     
     /**
      * 消息来源
      */
+    @TableField("source")
     private String source;
     
     /**
      * 关联ID(订单ID、活动ID等)
      */
+    @TableField("related_id")
     private Long relatedId;
     
     /**
      * 跳转链接
      */
+    @TableField("jump_url")
     private String jumpUrl;
     
     /**
      * 消息图标
      */
+    @TableField("icon")
     private String icon;
     
     /**
      * 是否已读:0-未读,1-已读
      */
+    @TableField("read")
     private Integer read;
     
     /**
      * 阅读时间
      */
+    @TableField("read_time")
     private LocalDateTime readTime;
     
     /**
      * 是否删除:0-否,1-是
      */
+    @TableField("deleted")
     private Integer deleted;
     
     /**
      * 删除时间
      */
+    @TableField("delete_time")
     private LocalDateTime deleteTime;
     
     /**
      * 发送时间
      */
+    @TableField("send_time")
     private LocalDateTime sendTime;
     
     /**
      * 创建时间
      */
+    @TableField("create_time")
     private LocalDateTime createTime;
     
     /**
      * 更新时间
      */
+    @TableField("update_time")
     private LocalDateTime updateTime;
     
     // 自定义构造方法
@@ -112,4 +130,3 @@ public class UserMessage {
         this.sendTime = LocalDateTime.now();
     }
 }
-

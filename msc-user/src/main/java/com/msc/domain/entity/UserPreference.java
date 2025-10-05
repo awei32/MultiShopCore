@@ -10,6 +10,8 @@ import lombok.NoArgsConstructor;
 import com.msc.domain.enums.ThemeEnum;
 import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableId;
+import com.baomidou.mybatisplus.annotation.TableField;
+import com.baomidou.mybatisplus.annotation.TableName;
 import com.msc.domain.enums.PrivacyLevelEnum;
 
 /**
@@ -19,6 +21,7 @@ import com.msc.domain.enums.PrivacyLevelEnum;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
+@TableName("user_preference")
 public class UserPreference {
     
     /**
@@ -30,96 +33,115 @@ public class UserPreference {
     /**
      * 用户ID
      */
+    @TableField("user_id")
     private Long userId;
     
     /**
      * 语言偏好
      */
+    @TableField("language")
     private String language;
     
     /**
      * 时区
      */
+    @TableField("timezone")
     private String timezone;
     
     /**
      * 货币偏好
      */
+    @TableField("currency")
     private String currency;
     
     /**
      * 主题偏好:light,dark,auto
      */
+    @TableField("theme")
     private String theme;
     
     /**
      * 是否接收邮件通知:0-否,1-是
      */
+    @TableField("email_notification")
     private Integer emailNotification;
     
     /**
      * 是否接收短信通知:0-否,1-是
      */
+    @TableField("sms_notification")
     private Integer smsNotification;
     
     /**
      * 是否接收推送通知:0-否,1-是
      */
+    @TableField("push_notification")
     private Integer pushNotification;
     
     /**
      * 是否接收营销信息:0-否,1-是
      */
+    @TableField("marketing_notification")
     private Integer marketingNotification;
     
     /**
      * 隐私设置:public,friends,private
      */
+    @TableField("privacy_level")
     private String privacyLevel;
     
     /**
      * 是否显示在线状态:0-否,1-是
      */
+    @TableField("show_online_status")
     private Integer showOnlineStatus;
     
     /**
      * 是否允许搜索:0-否,1-是
      */
+    @TableField("allow_search")
     private Integer allowSearch;
     
     /**
      * 默认收货地址ID
      */
+    @TableField("default_address_id")
     private Long defaultAddressId;
     
     /**
      * 偏好商品分类(JSON格式)
      */
+    @TableField("preferred_categories")
     private String preferredCategories;
     
     /**
      * 偏好品牌(JSON格式)
      */
+    @TableField("preferred_brands")
     private String preferredBrands;
     
     /**
      * 价格区间偏好(JSON格式)
      */
+    @TableField("price_range")
     private String priceRange;
     
     /**
      * 购物习惯(JSON格式)
      */
+    @TableField("shopping_habits")
     private String shoppingHabits;
     
     /**
      * 创建时间
      */
+    @TableField("create_time")
     private LocalDateTime createTime;
     
     /**
      * 更新时间
      */
+    @TableField("update_time")
     private LocalDateTime updateTime;
     
     // 自定义构造方法
