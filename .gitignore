@@ -16,3 +16,7 @@ target
 
 # 日志文件夹
 logs
+
+# 数据库挂载文件夹
+master
+slave
